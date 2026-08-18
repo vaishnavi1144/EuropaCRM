@@ -1,0 +1,25 @@
+{
+  "name": "europa-crm-fullstack",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "db:generate": "cd backend && npx prisma generate",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:seed": "cd backend && npx prisma db seed",
+    "db:link": "cd backend && npx tsx prisma/link-existing-data.ts",
+    "verify": "npm run build",
+    "db:deploy-ready": "npm run db:generate && node scripts/deploy-ready.mjs",
+    "deploy:ready": "npm ci && npm run db:deploy-ready && npm run build",
+    "db:reset-business": "npm run db:reset-business -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

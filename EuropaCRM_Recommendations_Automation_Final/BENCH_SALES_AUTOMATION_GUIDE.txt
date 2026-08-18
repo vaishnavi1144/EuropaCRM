@@ -1,0 +1,14 @@
+EUROPA CRM - BENCH SALES AUTOMATION
+
+1. Upload PDF/DOC/DOCX resume in Bench Consultants. Parsed data populates the existing Consultant form and skills field.
+2. Create a Job. The Job is visible to all Bench Sales users, while edit/delete remains limited to its creator and Super Admin.
+3. Saving the Job creates/synchronizes a linked Requirement.
+4. Open the Job record and click View Top Consultant Matches. Normal users see matches from their own consultants; Super Admin sees all.
+5. Create a Submission by selecting one Consultant and one Open Job. The system copies all linked details and stores match percentage/details.
+6. Change Submission status to Interview Scheduled to create an Interview draft.
+7. Complete Interview details and select the consultant to create an Offer draft.
+8. Accept the Offer. The system creates an Onboarding Placement, reduces remaining Job vacancies and marks the Job Filled when vacancies reach zero.
+9. Use Confirm Joining to record actual start/contract details; it updates the existing onboarding Placement and never duplicates it.
+
+Database note: run all Prisma migrations before using the workflow.
+Scheduler note: temporary PostgreSQL outages are logged and skipped instead of terminating the API.

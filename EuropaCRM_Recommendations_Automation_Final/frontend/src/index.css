@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #071B4A;
+  background: #F7FAFC;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+body { min-width: 320px; background: #F7FAFC; }
+button, input, select, textarea { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+
+.crm-topbar { left: 0; }
+.crm-main { margin-left: 0; }
+
+@media (min-width: 1024px) {
+  .crm-topbar { left: var(--sidebar-width); transition: left 300ms ease; }
+  .crm-main { margin-left: var(--sidebar-width); }
+}
+
+@layer components {
+  .crm-card { @apply rounded-xl border border-[#E4ECF3] bg-white shadow-[0_3px_12px_rgba(7,27,74,0.03)]; }
+  .crm-input { @apply h-10 w-full rounded-lg border border-[#E4ECF3] bg-white px-3 text-sm font-medium text-[#071B4A] outline-none transition focus:border-[#009E92] focus:ring-2 focus:ring-[#009E92]/10; }
+  .crm-select { @apply h-10 rounded-lg border border-[#E4ECF3] bg-white px-3 text-sm font-medium text-[#071B4A] outline-none transition hover:border-[#009E92]/50 focus:border-[#009E92]; }
+  .crm-icon-button { @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E4ECF3] bg-white text-[#071B4A] transition hover:border-[#009E92]/40 hover:bg-[#D9F5F1] hover:text-[#009E92]; }
+  .crm-primary-button { @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#009E92] px-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:translate-y-px; }
+  .crm-secondary-button { @apply inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#E4ECF3] bg-white px-3.5 text-sm font-bold text-[#009E92] transition hover:border-[#009E92]/40 hover:bg-[#D9F5F1]/30; }
+  .crm-table-head { @apply text-left text-[13px] font-extrabold uppercase tracking-[0.025em] text-[#071B4A]/80; }
+  .crm-table-cell { @apply whitespace-nowrap px-3 py-3.5 text-[14px] font-medium text-[#071B4A]; }
+}
+
+/* Stronger typography and contrast throughout the existing CRM screens. */
+.crm-app { font-size: 16px; color: #071B4A; }
+.crm-app form { gap: 0.75rem; }
+.crm-app form.space-y-6 > * + * { margin-top: 0.75rem; }
+.crm-app form.space-y-5 > * + * { margin-top: 0.75rem; }
+.crm-app form.space-y-4 > * + * { margin-top: 0.625rem; }
+.crm-app form input:not([type="checkbox"]):not([type="radio"]),
+.crm-app form select,
+.crm-app form textarea { font-size: 0.875rem; }
+.crm-app form textarea { min-height: 5rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.crm-app form label > span { margin-bottom: 0.375rem; font-size: 0.75rem; line-height: 1.25rem; }
+.crm-app [role="dialog"] form { row-gap: 0.75rem; }
+.crm-app [class~="text-[10px]"] { font-size: 12px !important; line-height: 1.45 !important; }
+.crm-app [class~="text-[11px]"] { font-size: 13px !important; line-height: 1.45 !important; }
+.crm-app [class~="text-[12px]"] { font-size: 14px !important; line-height: 1.5 !important; }
+.crm-app [class~="text-[13px]"] { font-size: 15px !important; line-height: 1.5 !important; }
+.crm-app [class~="text-[14px]"] { font-size: 16px !important; line-height: 1.5 !important; }
+.crm-app .text-xs { font-size: 0.875rem; line-height: 1.35rem; }
+.crm-app .text-sm { font-size: 1rem; line-height: 1.5rem; }
+.crm-app .text-slate-400 { color: #64748b; }
+.crm-app .text-slate-500 { color: #475569; }
+.crm-app .text-slate-600 { color: #334155; }
+.crm-app .border-slate-100 { border-color: #e2e8f0; }
+.crm-app .border-slate-200 { border-color: #cbd5e1; }
+
+/* Existing pages become usable on tablets and phones without altering their visual identity. */
+.crm-app main > div { max-width: 100%; }
+.crm-app table { min-width: 900px; }
+.crm-app div:has(> table) { overflow-x: auto; }
+
+@media (max-width: 1023px) {
+  .crm-app main > div { padding-left: 16px !important; padding-right: 16px !important; }
+  .crm-app .grid-cols-6, .crm-app .grid-cols-5, .crm-app .grid-cols-4, .crm-app .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .crm-app .w-56 { width: 100% !important; }
+  .crm-app .mt-6.flex.gap-6.items-start { flex-direction: column; }
+}
+
+@media (max-width: 639px) {
+  .crm-app main > div { padding: 14px 12px 24px !important; }
+  .crm-app .grid-cols-6, .crm-app .grid-cols-5, .crm-app .grid-cols-4, .crm-app .grid-cols-3, .crm-app .grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+  .crm-app .flex.items-start.justify-between { flex-wrap: wrap; gap: 14px; }
+  .crm-app .crm-card { border-radius: 14px; }
+  .crm-app table { min-width: 820px; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #aebfbe; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #7e9c98; border: 2px solid transparent; background-clip: padding-box; }
+
+
+/* Keep labels and values inside cards, bars and controls across the application. */
+.crm-app button, .crm-app a, .crm-app span, .crm-app strong, .crm-app p, .crm-app h1, .crm-app h2, .crm-app h3 { min-width: 0; }
+.crm-app button { max-width: 100%; }
+.crm-app .crm-card { overflow: hidden; }
+.crm-app .crm-card button, .crm-app .crm-primary-button, .crm-app .crm-secondary-button { white-space: normal; line-height: 1.25; text-align: center; }
+.crm-app [class*="rounded"][class*="bg-slate-100"] > div { max-width: 100%; overflow: hidden; }
+.h-13 { height: 3.25rem; }
+.h-18 { height: 4.5rem; }
+
+/* Use the arrow cursor on display-only/empty areas; show text cursor only in editable fields. */
+.crm-app, .crm-app div, .crm-app section, .crm-app article, .crm-app aside, .crm-app header, .crm-app footer,
+.crm-app p, .crm-app span, .crm-app strong, .crm-app h1, .crm-app h2, .crm-app h3, .crm-app td, .crm-app th { cursor: default; }
+.crm-app input:not([type="checkbox"]):not([type="radio"]), .crm-app textarea { cursor: text; }
+.crm-app button, .crm-app a, .crm-app select, .crm-app input[type="checkbox"], .crm-app input[type="radio"], .crm-app label:has(input[type="checkbox"]), .crm-app label:has(input[type="radio"]) { cursor: pointer; }

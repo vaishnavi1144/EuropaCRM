@@ -1,0 +1,846 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String                 @id @default(cuid())
+  name               String
+  email              String                 @unique
+  role               String                 @default("SALES")
+  avatarUrl          String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  username           String?                @unique
+  passwordHash       String?
+  isActive           Boolean                @default(true)
+  lastLoginAt        DateTime?
+  permissions        Json?
+  ownedAccounts      Account[]              @relation("AccountOwner")
+  ownedActivities    Activity[]             @relation("ActivityOwner")
+  ownedProjects      AiProject[]            @relation("ProjectOwner")
+  assignedTasks      AiTask[]               @relation("TaskAssignee")
+  auditLogs          AuditLog[]
+  sessions           AuthSession[]
+  ownedBench         Bench[]                @relation("BenchOwner")
+  ownedApplications  CandidateApplication[] @relation("ApplicationOwner")
+  ownedContacts      Contact[]              @relation("ContactOwner")
+  ownedLeads         Lead[]                 @relation("LeadOwner")
+  mailGroups         MailGroup[]
+  notifications      Notification[]
+  ownedOpportunities Opportunity[]          @relation("OpportunityOwner")
+  managerId          String?
+  manager            User?                  @relation("UserManager", fields: [managerId], references: [id])
+  teamMembers        User[]                 @relation("UserManager")
+}
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Lead {
+  id                     String        @id @default(cuid())
+  name                   String
+  company                String
+  email                  String
+  phone                  String?
+  leadSource             String        @default("Website")
+  status                 String        @default("New")
+  ownerName              String
+  rating                 Int           @default(3)
+  createdOn              String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  customData             Json?
+  ownerId                String?
+  convertedAt            DateTime?
+  convertedById          String?
+  convertedContactId     String?       @unique
+  convertedAccountId     String?
+  convertedOpportunityId String?       @unique
+  sourcedContacts        Contact[]     @relation("SourceLeadContacts")
+  convertedAccount       Account?      @relation("ConvertedLeadAccount", fields: [convertedAccountId], references: [id])
+  convertedContact       Contact?      @relation("ConvertedLeadContact", fields: [convertedContactId], references: [id])
+  convertedOpportunity   Opportunity?  @relation("ConvertedLeadOpportunity", fields: [convertedOpportunityId], references: [id])
+  owner                  User?         @relation("LeadOwner", fields: [ownerId], references: [id])
+  sourcedOpportunities   Opportunity[] @relation("SourceLeadOpportunities")
+
+  @@index([name])
+  @@index([company])
+  @@index([status])
+  @@index([ownerId])
+  @@index([email])
+}
+
+model Contact {
+  id                 String        @id @default(cuid())
+  name               String
+  title              String?
+  company            String
+  email              String
+  phone              String?
+  contactType        String        @default("Influencer")
+  source             String        @default("Website")
+  ownerName          String
+  lastContacted      String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  customData         Json?
+  ownerId            String?
+  accountId          String?
+  sourceLeadId       String?
+  primaryForAccounts Account[]     @relation("PrimaryContact")
+  aiProjects         AiProject[]
+  account            Account?      @relation(fields: [accountId], references: [id])
+  owner              User?         @relation("ContactOwner", fields: [ownerId], references: [id])
+  sourceLead         Lead?         @relation("SourceLeadContacts", fields: [sourceLeadId], references: [id])
+  convertedFromLead  Lead?         @relation("ConvertedLeadContact")
+  opportunities      Opportunity[] @relation("OpportunityPrimaryContact")
+
+  @@index([name])
+  @@index([company])
+  @@index([accountId])
+  @@index([sourceLeadId])
+  @@index([ownerId])
+  @@index([email])
+}
+
+model Account {
+  id                   String        @id @default(cuid())
+  accountName          String
+  location             String?
+  accountType          String        @default("Prospect")
+  industry             String?
+  primaryContact       String?
+  primaryTitle         String?
+  email                String?
+  phone                String?
+  ownerName            String
+  status               String        @default("Active")
+  createdOn            String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  customData           Json?
+  normalizedName       String?
+  lifecycleStatus      String        @default("Prospect")
+  primaryContactId     String?
+  ownerId              String?
+  owner                User?         @relation("AccountOwner", fields: [ownerId], references: [id])
+  primaryContactRecord Contact?      @relation("PrimaryContact", fields: [primaryContactId], references: [id])
+  aiProjects           AiProject[]
+  contacts             Contact[]
+  convertedLeads       Lead[]        @relation("ConvertedLeadAccount")
+  opportunities        Opportunity[]
+
+  @@index([accountName])
+  @@index([normalizedName])
+  @@index([industry])
+  @@index([ownerId])
+  @@index([lifecycleStatus])
+}
+
+model Opportunity {
+  id                String                    @id @default(cuid())
+  opportunityName   String
+  accountName       String
+  stage             String                    @default("Qualification")
+  amount            Int                       @default(0)
+  closeDate         String?
+  ownerName         String
+  probability       Int                       @default(0)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  customData        Json?
+  accountId         String?
+  primaryContactId  String?
+  sourceLeadId      String?
+  finalAmount       Int?
+  closeNotes        String?
+  deliveryType      String?
+  ownerId           String?
+  aiProject         AiProject?
+  convertedFromLead Lead?                     @relation("ConvertedLeadOpportunity")
+  account           Account?                  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  owner             User?                     @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  primaryContact    Contact?                  @relation("OpportunityPrimaryContact", fields: [primaryContactId], references: [id])
+  sourceLead        Lead?                     @relation("SourceLeadOpportunities", fields: [sourceLeadId], references: [id])
+  stageHistory      OpportunityStageHistory[]
+
+  @@index([opportunityName])
+  @@index([stage])
+  @@index([accountId])
+  @@index([ownerId])
+  @@index([sourceLeadId])
+}
+
+model OpportunityStageHistory {
+  id            String      @id @default(cuid())
+  opportunityId String
+  fromStage     String?
+  toStage       String
+  reason        String?
+  changedById   String?
+  createdAt     DateTime    @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId, createdAt])
+}
+
+model Campaign {
+  id             String           @id @default(cuid())
+  campaignName   String
+  type           String
+  status         String           @default("Draft")
+  targetAudience String?
+  emailsSent     Int              @default(0)
+  responses      Int              @default(0)
+  openRate       String           @default("0%")
+  clickRate      String           @default("0%")
+  ownerName      String
+  startDate      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  customData     Json?
+  members        CampaignMember[]
+
+  @@index([campaignName])
+  @@index([status])
+}
+
+model CampaignMember {
+  id             String       @id @default(cuid())
+  campaignId     String
+  contactId      String?
+  email          String
+  status         String       @default("Pending")
+  unsubscribedAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  campaign       Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  events         EmailEvent[]
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
+
+model EmailEvent {
+  id                String         @id @default(cuid())
+  campaignMemberId  String
+  eventType         String
+  providerMessageId String?
+  metadata          Json?
+  occurredAt        DateTime       @default(now())
+  member            CampaignMember @relation(fields: [campaignMemberId], references: [id], onDelete: Cascade)
+
+  @@index([campaignMemberId, eventType])
+  @@index([occurredAt])
+}
+
+model Activity {
+  id                String   @id @default(cuid())
+  activity          String
+  description       String?
+  relatedTo         String?
+  relatedType       String?
+  type              String
+  status            String   @default("Pending")
+  priority          String   @default("Medium")
+  ownerName         String
+  dueDate           String?
+  dueTime           String?
+  createdOn         String?
+  createdTime       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  customData        Json?
+  relatedEntityType String?
+  relatedEntityId   String?
+  ownerId           String?
+  owner             User?    @relation("ActivityOwner", fields: [ownerId], references: [id])
+
+  @@index([activity])
+  @@index([status])
+  @@index([ownerId])
+  @@index([relatedEntityType, relatedEntityId])
+}
+
+model Candidate {
+  id              String                 @id @default(cuid())
+  name            String
+  email           String
+  phone           String?
+  skills          String
+  experienceYears Int                    @default(0)
+  status          String                 @default("New")
+  resumeUrl       String?
+  ownerName       String
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  customData      Json?
+  benchProfiles   Bench?
+  applications    CandidateApplication[]
+  interviews      Interview[]
+  offers          Offer[]
+
+  @@index([name])
+  @@index([status])
+  @@index([email])
+}
+
+model Job {
+  id                    String                 @id @default(cuid())
+  jobReference          String?                @unique
+  jobTitle              String
+  company               String
+  endClient             String?
+  implementationPartner String?
+  vendorCompany         String?
+  vendorEmail           String?
+  vendorContact         String?
+  skillsRequired        String?
+  preferredSkills       String?
+  experienceRequired    String?
+  minExperience         Float                  @default(0)
+  maxExperience         Float?
+  visaRequirements      String?
+  maxRate               Float?
+  rateType              String?
+  currency              String                 @default("USD")
+  jobType               String                 @default("Full-Time")
+  workMode              String?
+  location              String?
+  status                String                 @default("Open")
+  salaryRange           String?
+  receivedDate          String?
+  expiryDate            String?
+  jobDescription        String?
+  ownerName             String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  customData            Json?
+  vacancyCount          Int                    @default(1)
+  requirementId         String?                @unique
+  requirement           Requirement?           @relation(fields: [requirementId], references: [id])
+  submissions           Submission[]
+  applications          CandidateApplication[]
+  interviews            Interview[]
+  offers                Offer[]
+
+  @@index([jobTitle])
+  @@index([company])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+model CandidateApplication {
+  id              String                     @id @default(cuid())
+  candidateId     String
+  jobId           String
+  stage           String                     @default("New")
+  ownerId         String?
+  rejectionReason String?
+  placedAt        DateTime?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  history         ApplicationStatusHistory[]
+  candidate       Candidate                  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job             Job                        @relation(fields: [jobId], references: [id])
+  owner           User?                      @relation("ApplicationOwner", fields: [ownerId], references: [id])
+  interviews      Interview[]
+  offers          Offer[]
+
+  @@unique([candidateId, jobId])
+  @@index([stage])
+  @@index([ownerId])
+}
+
+model ApplicationStatusHistory {
+  id            String               @id @default(cuid())
+  applicationId String
+  fromStatus    String?
+  toStatus      String
+  reason        String?
+  changedById   String?
+  createdAt     DateTime             @default(now())
+  application   CandidateApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
+model Interview {
+  id            String                @id @default(cuid())
+  candidateName String
+  jobTitle      String
+  interviewDate String?
+  interviewTime String?
+  status        String                @default("Scheduled")
+  interviewer   String
+  feedback      String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  customData    Json?
+  applicationId String?
+  candidateId   String?
+  jobId         String?
+  application   CandidateApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidate     Candidate?            @relation(fields: [candidateId], references: [id])
+  job           Job?                  @relation(fields: [jobId], references: [id])
+  offers        Offer[]
+
+  @@index([candidateName])
+  @@index([status])
+  @@index([applicationId])
+  @@index([candidateId])
+  @@index([jobId])
+}
+
+model Offer {
+  id             String                @id @default(cuid())
+  candidateName  String
+  jobTitle       String
+  offerAmount    Int                   @default(0)
+  joiningDate    String?
+  status         String                @default("Pending")
+  ownerName      String
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  customData     Json?
+  applicationId  String?
+  interviewId    String?
+  candidateId    String?
+  jobId          String?
+  revision       Int                   @default(1)
+  decisionReason String?
+  application    CandidateApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidate      Candidate?            @relation(fields: [candidateId], references: [id])
+  interview      Interview?            @relation(fields: [interviewId], references: [id])
+  job            Job?                  @relation(fields: [jobId], references: [id])
+  revisions      OfferRevision[]
+
+  @@index([candidateName])
+  @@index([status])
+  @@index([applicationId])
+  @@index([candidateId])
+  @@index([jobId])
+}
+
+model OfferRevision {
+  id          String   @id @default(cuid())
+  offerId     String
+  revision    Int
+  amount      Int
+  joiningDate String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  offer       Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, revision])
+}
+
+model Bench {
+  id              String           @id @default(cuid())
+  candidateName   String
+  skills          String
+  visaStatus      String
+  validVisa       String?
+  consultantCode  String?          @unique
+  experienceYears Float            @default(0)
+  marketingStatus String           @default("Active")
+  ratePerHour     Float            @default(0)
+  resumeUrl       String?
+  ownerName       String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  customData      Json?
+  candidateId     String?          @unique
+  ownerId         String?
+  candidate       Candidate?       @relation(fields: [candidateId], references: [id])
+  owner           User?            @relation("BenchOwner", fields: [ownerId], references: [id])
+  benchInterviews BenchInterview[]
+  benchOffers     BenchOffer[]
+  placements      Placement[]
+  submissions     Submission[]
+
+  @@index([candidateName])
+  @@index([marketingStatus])
+  @@index([ownerId])
+}
+
+model Requirement {
+  id               String       @id @default(cuid())
+  title            String
+  clientCompany    String
+  vendorCompany    String?
+  skills           String
+  minExperience    Float        @default(0)
+  location         String?
+  visaRequirements String?
+  maxRate          Float?
+  status           String       @default("Open")
+  customData       Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  job              Job?
+  submissions      Submission[]
+
+  @@index([status])
+  @@index([clientCompany])
+}
+
+model Submission {
+  id                String           @id @default(cuid())
+  candidateName     String
+  vendorCompany     String
+  candidateCompany  String?
+  vendorEmail       String?
+  implementationName String?
+  jobTitle          String
+  ratePerHour       Float            @default(0)
+  submissionDate    String?
+  status            String           @default("Submitted")
+  feedback          String?
+  ownerName         String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  customData        Json?
+  benchConsultantId String?
+  requirementId     String?
+  jobId             String?
+  matchPercentage   Int?
+  matchDetails      Json?
+  benchInterviews   BenchInterview[]
+  benchOffers       BenchOffer[]
+  placement         Placement?
+  submissionEmails  SubmissionEmail[]
+  benchConsultant   Bench?           @relation(fields: [benchConsultantId], references: [id], onDelete: Restrict)
+  requirement       Requirement?     @relation(fields: [requirementId], references: [id])
+  job               Job?             @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@index([candidateName])
+  @@index([status])
+  @@index([benchConsultantId])
+  @@index([requirementId])
+  @@index([jobId])
+  @@unique([benchConsultantId, jobId, vendorCompany])
+}
+
+enum SubmissionEmailStatus {
+  Draft
+  Sent
+  Failed
+  Opened
+  Replied
+}
+
+model SubmissionEmail {
+  id            String                  @id @default(cuid())
+  submissionId  String
+  toEmail       String
+  ccEmail       String?
+  subject       String
+  body          String
+  attachments   Json?
+  sentBy        String
+  sentDate      DateTime?
+  status        SubmissionEmailStatus  @default(Draft)
+  messageId     String?
+  createdAt     DateTime                @default(now())
+  submission    Submission              @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([status])
+}
+
+model BenchInterview {
+  id                String       @id @default(cuid())
+  candidateName     String
+  submissionId      String?
+  benchConsultantId String
+  clientCompany     String?
+  vendorCompany     String?
+  jobTitle          String
+  technology        String?
+  vendorEmail       String?
+  submissionRate    Float?
+  workLocation      String?
+  workMode          String?
+  interviewRound    String       @default("Round 1")
+  interviewDate     String?
+  interviewTime     String?
+  timeZone          String?
+  interviewMode     String?
+  meetingLink       String?
+  interviewer       String?
+  status            String       @default("Scheduled")
+  result            String       @default("Pending")
+  feedbackDate      String?
+  feedback          String?
+  rejectionStage    String?
+  rejectionReason   String?
+  ownerName         String
+  customData        Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  benchConsultant   Bench        @relation(fields: [benchConsultantId], references: [id])
+  submission        Submission?  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  offers            BenchOffer[]
+
+  @@index([candidateName])
+  @@index([submissionId])
+  @@index([benchConsultantId])
+  @@index([interviewDate])
+  @@index([status])
+}
+
+model BenchOffer {
+  id                  String          @id @default(cuid())
+  candidateName       String
+  submissionId        String
+  benchConsultantId   String
+  benchInterviewId    String?
+  clientCompany       String
+  vendorCompany       String?
+  jobTitle            String
+  offerDate           String?
+  offerReceivedDate   String?
+  offerAcceptedDate   String?
+  offerRejectedDate   String?
+  offerExpiryDate     String?
+  expectedJoiningDate String?
+  billRate            Float           @default(0)
+  payRate             Float           @default(0)
+  rateType            String          @default("C2C")
+  workLocation        String?
+  contractDuration    String?
+  status              String          @default("Pending")
+  decisionReason      String?
+  ownerName           String
+  customData          Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  benchConsultant     Bench           @relation(fields: [benchConsultantId], references: [id])
+  benchInterview      BenchInterview? @relation(fields: [benchInterviewId], references: [id])
+  submission          Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  placement           Placement?
+
+  @@index([candidateName])
+  @@index([submissionId])
+  @@index([benchConsultantId])
+  @@index([offerDate])
+  @@index([status])
+}
+
+model Placement {
+  id                String      @id @default(cuid())
+  candidateName     String
+  clientCompany     String
+  vendorCompany     String
+  vendorEmail         String?
+  vendorContactNumber String?
+  billingRate       Float       @default(0)
+  startDate         String?
+  endDate           String?
+  status            String      @default("Active")
+  ownerName         String
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  customData        Json?
+  submissionId      String?     @unique
+  benchConsultantId String?
+  benchOfferId      String?     @unique
+  benchConsultant   Bench?      @relation(fields: [benchConsultantId], references: [id], onDelete: Restrict)
+  benchOffer        BenchOffer? @relation(fields: [benchOfferId], references: [id])
+  submission        Submission? @relation(fields: [submissionId], references: [id])
+
+  @@index([candidateName])
+  @@index([status])
+  @@index([benchConsultantId])
+  @@index([startDate, endDate])
+}
+
+model AiProject {
+  id                  String            @id @default(cuid())
+  projectName         String
+  description         String?
+  techStack           String
+  status              String            @default("Planning")
+  startDate           String?
+  endDate             String?
+  leadEngineer        String
+  ownerName           String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  customData          Json?
+  progress            Int               @default(0)
+  ownerId             String?
+  sourceOpportunityId String?           @unique
+  accountId           String?
+  contactId           String?
+  account             Account?          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  contact             Contact?          @relation(fields: [contactId], references: [id])
+  owner               User?             @relation("ProjectOwner", fields: [ownerId], references: [id])
+  sourceOpportunity   Opportunity?      @relation(fields: [sourceOpportunityId], references: [id])
+  tasks               AiTask[]
+  allocations         ProjectResource[]
+
+  @@index([projectName])
+  @@index([status])
+  @@index([ownerId])
+  @@index([accountId])
+}
+
+model ProjectTaskTemplate {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  description   String?
+  defaultWeight Int      @default(1)
+  mandatory     Boolean  @default(true)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AiTask {
+  id            String     @id @default(cuid())
+  taskName      String
+  projectName   String
+  status        String     @default("Todo")
+  priority      String     @default("Medium")
+  assignee      String
+  dueDate       String?
+  description   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  customData    Json?
+  projectId     String?
+  assigneeId    String?
+  weight        Int        @default(1)
+  mandatory     Boolean    @default(true)
+  blockedReason String?
+  assigneeUser  User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  project       AiProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([taskName])
+  @@index([status])
+  @@index([projectId])
+  @@index([assigneeId])
+}
+
+model AiResource {
+  id               String            @id @default(cuid())
+  name             String
+  type             String
+  allocationStatus String            @default("Available")
+  skillLevel       String            @default("Intermediate")
+  costPerHour      Int               @default(0)
+  ownerName        String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  customData       Json?
+  capacityPercent  Int               @default(100)
+  allocations      ProjectResource[]
+
+  @@index([name])
+  @@index([allocationStatus])
+}
+
+model ProjectResource {
+  id                String     @id @default(cuid())
+  projectId         String
+  resourceId        String
+  allocationPercent Int        @default(100)
+  startDate         String?
+  endDate           String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  project           AiProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  resource          AiResource @relation(fields: [resourceId], references: [id])
+
+  @@unique([projectId, resourceId])
+  @@index([resourceId])
+  @@index([projectId])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  message    String
+  entityType String?
+  entityId   String?
+  readAt     DateTime?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  beforeData Json?
+  afterData  Json?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MailGroup {
+  id          String            @id @default(cuid())
+  ownerUserId String
+  module      String
+  groupName   String
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  owner       User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members     MailGroupMember[]
+
+  @@unique([ownerUserId, module, groupName])
+  @@index([ownerUserId, module])
+  @@index([ownerUserId, module, updatedAt])
+}
+
+model MailGroupMember {
+  id         String    @id @default(cuid())
+  groupId    String
+  entityType String
+  entityId   String
+  createdAt  DateTime  @default(now())
+  group      MailGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, entityType, entityId])
+  @@index([groupId])
+  @@index([entityType, entityId])
+}
