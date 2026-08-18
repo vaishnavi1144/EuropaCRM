@@ -5,9 +5,44 @@ import { hasPermission } from '../lib/permissions.js';
 export const reportsRouter = Router();
 
 function isAdmin(user: any) { return ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(String(user?.role ?? '').toUpperCase()); }
-function customOrOwnerNameScope(user: any): any {
+function customOrOwnerNameScope(user: any, modelName: string): any {
   if (isAdmin(user)) return {};
-  return { customData: { path: ['createdByUserId'], equals: user.id } };
+  const clauses: any[] = [
+    { customData: { path: ['createdByUserId'], equals: user.id } }
+  ];
+
+  const hasOwnerFields = ['lead', 'contact', 'account', 'opportunity', 'activity', 'bench', 'aiProject', 'campaign'].includes(modelName);
+  if (hasOwnerFields) {
+    if (user.id && modelName !== 'campaign') {
+      clauses.push({ ownerId: user.id });
+    }
+    if (user.name) {
+      clauses.push({ ownerName: { equals: user.name, mode: 'insensitive' } });
+    }
+  }
+
+  if (['submission', 'benchInterview', 'benchOffer', 'placement'].includes(modelName)) {
+    if (user.id) {
+      clauses.push({ benchConsultant: { ownerId: user.id } });
+    }
+    if (user.name) {
+      clauses.push({ ownerName: { equals: user.name, mode: 'insensitive' } });
+    }
+  }
+
+  if (modelName === 'candidate') {
+    if (user.name) {
+      clauses.push({ ownerName: { equals: user.name, mode: 'insensitive' } });
+    }
+  }
+
+  if (modelName === 'aiTask') {
+    if (user.id) {
+      clauses.push({ assigneeId: user.id });
+    }
+  }
+
+  return { OR: clauses };
 }
 
 reportsRouter.get('/overview', async (_req, res, next) => {
@@ -15,28 +50,27 @@ reportsRouter.get('/overview', async (_req, res, next) => {
     const user = res.locals.authUser ?? {};
     if (!hasPermission(user, 'dashboard')) return res.status(403).json({ message: 'You do not have access to the dashboard.' });
     const allowed = (permission: string) => hasPermission(user, permission);
-    const scope = customOrOwnerNameScope(user);
     const [leads, contacts, accounts, opportunities, campaigns, activities, candidates, jobs, bench, submissions, benchInterviews, benchOffers, placements, rejectedSubmissions, onHoldConsultants, todayInterviews, aiProjects, tasks, won, pipeline] = await Promise.all([
-      allowed('leads') ? prisma.lead.count({ where: scope }) : 0,
-      allowed('contacts') ? prisma.contact.count({ where: scope }) : 0,
-      allowed('accounts') ? prisma.account.count({ where: scope }) : 0,
-      allowed('opportunities') ? prisma.opportunity.count({ where: scope }) : 0,
-      allowed('campaigns') ? prisma.campaign.count({ where: scope }) : 0,
-      allowed('activities') ? prisma.activity.count({ where: scope }) : 0,
-      allowed('candidates') ? prisma.candidate.count({ where: scope }) : 0,
+      allowed('leads') ? prisma.lead.count({ where: customOrOwnerNameScope(user, 'lead') }) : 0,
+      allowed('contacts') ? prisma.contact.count({ where: customOrOwnerNameScope(user, 'contact') }) : 0,
+      allowed('accounts') ? prisma.account.count({ where: customOrOwnerNameScope(user, 'account') }) : 0,
+      allowed('opportunities') ? prisma.opportunity.count({ where: customOrOwnerNameScope(user, 'opportunity') }) : 0,
+      allowed('campaigns') ? prisma.campaign.count({ where: customOrOwnerNameScope(user, 'campaign') }) : 0,
+      allowed('activities') ? prisma.activity.count({ where: customOrOwnerNameScope(user, 'activity') }) : 0,
+      allowed('candidates') ? prisma.candidate.count({ where: customOrOwnerNameScope(user, 'candidate') }) : 0,
       allowed('jobs') ? prisma.job.count({ where: { status: { in: ['Open', 'Active'] } } }) : 0,
-      allowed('bench') ? prisma.bench.count({ where: scope }) : 0,
-      allowed('submissions') ? prisma.submission.count({ where: scope }) : 0,
-      allowed('submissions') ? prisma.benchInterview.count({ where: scope }) : 0,
-      allowed('placements') ? prisma.benchOffer.count({ where: scope }) : 0,
-      allowed('placements') ? prisma.placement.count({ where: scope }) : 0,
-      allowed('submissions') ? prisma.submission.count({ where: { AND: [scope, { status: 'Rejected' }] } }) : 0,
-      allowed('bench') ? prisma.bench.count({ where: { AND: [scope, { marketingStatus: 'On Hold' }] } }) : 0,
-      allowed('submissions') ? prisma.benchInterview.count({ where: { AND: [scope, { interviewDate: new Date().toISOString().slice(0,10), status: { in: ['Scheduled', 'Confirmed'] } }] } }) : 0,
-      allowed('ai-projects') ? prisma.aiProject.count({ where: scope }) : 0,
-      allowed('tasks') ? prisma.aiTask.count({ where: scope }) : 0,
-      allowed('opportunities') ? prisma.opportunity.count({ where: { AND: [scope, { stage: 'Closed Won' }] } }) : 0,
-      allowed('opportunities') ? prisma.opportunity.aggregate({ where: scope, _sum: { amount: true } }) : Promise.resolve({ _sum: { amount: 0 } }),
+      allowed('bench') ? prisma.bench.count({ where: customOrOwnerNameScope(user, 'bench') }) : 0,
+      allowed('submissions') ? prisma.submission.count({ where: customOrOwnerNameScope(user, 'submission') }) : 0,
+      allowed('submissions') ? prisma.benchInterview.count({ where: customOrOwnerNameScope(user, 'benchInterview') }) : 0,
+      allowed('placements') ? prisma.benchOffer.count({ where: customOrOwnerNameScope(user, 'benchOffer') }) : 0,
+      allowed('placements') ? prisma.placement.count({ where: customOrOwnerNameScope(user, 'placement') }) : 0,
+      allowed('submissions') ? prisma.submission.count({ where: { AND: [customOrOwnerNameScope(user, 'submission'), { status: 'Rejected' }] } }) : 0,
+      allowed('bench') ? prisma.bench.count({ where: { AND: [customOrOwnerNameScope(user, 'bench'), { marketingStatus: 'On Hold' }] } }) : 0,
+      allowed('submissions') ? prisma.benchInterview.count({ where: { AND: [customOrOwnerNameScope(user, 'benchInterview'), { interviewDate: new Date().toISOString().slice(0,10), status: { in: ['Scheduled', 'Confirmed'] } }] } }) : 0,
+      allowed('ai-projects') ? prisma.aiProject.count({ where: customOrOwnerNameScope(user, 'aiProject') }) : 0,
+      allowed('tasks') ? prisma.aiTask.count({ where: customOrOwnerNameScope(user, 'aiTask') }) : 0,
+      allowed('opportunities') ? prisma.opportunity.count({ where: { AND: [customOrOwnerNameScope(user, 'opportunity'), { stage: 'Closed Won' }] } }) : 0,
+      allowed('opportunities') ? prisma.opportunity.aggregate({ where: customOrOwnerNameScope(user, 'opportunity'), _sum: { amount: true } }) : Promise.resolve({ _sum: { amount: 0 } }),
     ]);
     res.json({ leads, contacts, accounts, opportunities, campaigns, activities, candidates, jobs, bench, submissions, benchInterviews, benchOffers, placements, rejectedSubmissions, onHoldConsultants, todayInterviews, aiProjects, tasks, pipelineValue: pipeline._sum.amount ?? 0, winRate: opportunities ? Number(((won / opportunities) * 100).toFixed(1)) : 0 });
   } catch (error) { next(error); }
@@ -55,20 +89,24 @@ reportsRouter.get('/bench-dashboard', async (req, res, next) => {
     const dateTo = dateToQuery ? new Date(`${dateToQuery}T23:59:59Z`) : null;
 
     const roleNormalized = authUser.role ? authUser.role.toUpperCase() : 'SALES';
+    const isUserAdmin = isAdmin(authUser);
     const isManager = roleNormalized === 'MANAGER';
-    const isBenchRecruiter = roleNormalized === 'BENCHSALES';
 
-    let recruiterWhere: any = { role: 'BENCHSALES', isActive: true };
-    if (isManager) {
-      recruiterWhere = {
-        role: 'BENCHSALES',
-        isActive: true,
-        OR: [
-          { managerId: authUser.id },
-          { id: authUser.id }
-        ]
-      };
-    } else if (isBenchRecruiter) {
+    let recruiterWhere: any = {};
+    if (isUserAdmin) {
+      if (isManager) {
+        recruiterWhere = {
+          role: 'BENCHSALES',
+          isActive: true,
+          OR: [
+            { managerId: authUser.id },
+            { id: authUser.id }
+          ]
+        };
+      } else {
+        recruiterWhere = { role: 'BENCHSALES', isActive: true };
+      }
+    } else {
       recruiterWhere = { id: authUser.id };
     }
 

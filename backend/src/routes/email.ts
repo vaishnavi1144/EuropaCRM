@@ -39,7 +39,7 @@ emailRouter.get('/check/:module', async (req, res, next) => {
   try {
     const module = moduleSchema.parse(req.params.module);
     if (!ensure(res.locals.authUser, module, 'view', res)) return;
-    res.json(await checkMailConnection(module));
+    res.json(await checkMailConnection(module, res.locals.authUser));
   } catch (e) {
     next(e);
   }
@@ -265,7 +265,7 @@ emailRouter.post('/send', async (req, res, next) => {
       }
     }
 
-    const result = await sendMail(input.module, emails.join(','), input.subject, input.body, input.cc, input.attachments);
+    const result = await sendMail(input.module, emails.join(','), input.subject, input.body, input.cc, input.attachments, res.locals.authUser);
 
     if (targetSubmissionIds.length > 0) {
       const now = new Date();

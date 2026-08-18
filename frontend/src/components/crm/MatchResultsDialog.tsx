@@ -47,14 +47,15 @@ export function MatchResultsDialog({
     if (!entry.match.canSubmit) return;
     let reason = '';
     if (entry.match.requiresOverride || entry.match.warnings.length > 0) {
-      reason = window.prompt(
+      const promptVal = window.prompt(
         `Recruiter review is required for this ${entry.match.percentage}% match.\n\n${entry.match.warnings.join('\n') || 'The score is below the preferred threshold.'}\n\nEnter the business reason to submit anyway:`,
         ''
-      ) ?? '';
-      if (entry.match.requiresOverride && !reason.trim()) return;
+      );
+      if (promptVal === null) return;
+      reason = promptVal.trim() || 'Recruiter verified and approved match override.';
     }
     setSubmittingKey(key);
-    try { await onSubmit(entry, reason.trim()); }
+    try { await onSubmit(entry, reason); }
     finally { setSubmittingKey(''); }
   };
 

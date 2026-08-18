@@ -103,6 +103,15 @@ export function Dashboard() {
   const [selectedDept, setSelectedDept] = useState('All Departments');
 
   const { dashboardData: contextDashboardData, setDashboardData: setContextDashboardData, selectedUser: selectedUserFromContext, setSelectedUser: setSelectedUserInContext } = useDashboardLayout();
+  const [activeDashboard, setActiveDashboard] = useState<string>(currentUser?.dashboardType || 'BENCHSALES');
+  const [overviewData, setOverviewData] = useState<any>(null);
+
+  // Sync active dashboard when currentUser changes
+  useEffect(() => {
+    if (currentUser?.dashboardType) {
+      setActiveDashboard(currentUser.dashboardType);
+    }
+  }, [currentUser]);
 
   // Dashboard metrics state
   const dashboardData = contextDashboardData as BenchDashboardData | null;
@@ -132,8 +141,12 @@ export function Dashboard() {
       if (dateTo) filters.dateTo = dateTo;
       if (selectedRole !== 'All Roles') filters.role = selectedRole;
 
-      const data = await api.benchDashboard<BenchDashboardData>(filters);
+      const [data, overview] = await Promise.all([
+        api.benchDashboard<BenchDashboardData>(filters),
+        api.overview<any>()
+      ]);
       setContextDashboardData(data);
+      setOverviewData(overview);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load dashboard analytics');
     } finally {
@@ -312,11 +325,16 @@ export function Dashboard() {
         {/* Top Header & Filters */}
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-[24px] font-black text-[#071B4A]">Admin Dashboard</h1>
+            <h1 className="text-[24px] font-black text-[#071B4A]">
+              {activeDashboard === 'SALES' ? 'Sales & Marketing Dashboard' :
+               activeDashboard === 'RECRUITER' ? 'IT Recruitment Dashboard' :
+               activeDashboard === 'AITEAM' ? 'AI Projects Dashboard' :
+               isAdminOrManager ? 'Admin Dashboard' : 'Recruiter Dashboard'}
+            </h1>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Date Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+             {/* Date Filters */}
             <div className="inline-flex items-center gap-2 rounded-lg border border-[#E4ECF3] bg-white px-3 py-1.5 shadow-sm">
               <CalendarDays className="h-4 w-4 text-[#009E92]" />
               <input
@@ -333,24 +351,42 @@ export function Dashboard() {
                 onChange={(e) => setDateTo(e.target.value)}
               />
             </div>
-
+ 
+            {/* Dashboard Switcher (Admins only) */}
+            {['SUPER_ADMIN', 'ADMIN'].includes(String(currentUser?.role).toUpperCase()) && (
+              <div className="relative">
+                <select
+                  className="appearance-none rounded-lg border border-[#E4ECF3] bg-white pl-4 pr-10 py-2 text-[13px] font-bold text-[#009E92] shadow-sm outline-none cursor-pointer"
+                  value={activeDashboard}
+                  onChange={(e) => setActiveDashboard(e.target.value)}
+                >
+                  <option value="BENCHSALES">Bench Sales Dashboard</option>
+                  <option value="SALES">Sales Dashboard</option>
+                  <option value="RECRUITER">Recruitment Dashboard</option>
+                  <option value="AITEAM">AI Team Dashboard</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#009E92] pointer-events-none" />
+              </div>
+            )}
+ 
             {/* Role dropdown */}
-            <div className="relative">
-              <select
-                className="appearance-none rounded-lg border border-[#E4ECF3] bg-white pl-4 pr-10 py-2 text-[13px] font-bold text-[#071B4A] shadow-sm outline-none cursor-pointer"
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-              >
-                <option value="All Roles">All Roles</option>
-                <option value="SUPER_ADMIN">Super Admin</option>
-                <option value="SALES">Sales & Marketing</option>
-                <option value="RECRUITER">IT Recruitment</option>
-                <option value="BENCHSALES">Bench Sales</option>
-                <option value="AITEAM">AI Team</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-            </div>
-
+            {isAdminOrManager && activeDashboard === 'BENCHSALES' && (
+              <div className="relative">
+                <select
+                  className="appearance-none rounded-lg border border-[#E4ECF3] bg-white pl-4 pr-10 py-2 text-[13px] font-bold text-[#071B4A] shadow-sm outline-none cursor-pointer"
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                >
+                  <option value="All Roles">All Roles</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="SALES">Sales & Marketing</option>
+                  <option value="RECRUITER">IT Recruitment</option>
+                  <option value="BENCHSALES">Bench Sales</option>
+                  <option value="AITEAM">AI Team</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              </div>
+            )}
           </div>
         </div>
 
@@ -365,7 +401,28 @@ export function Dashboard() {
               
               {/* Top Summary Cards */}
               <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-                {isAdminOrManager ? (
+                {activeDashboard === 'SALES' ? (
+                  <>
+                    <SummaryCard label="Total Leads" value={overviewData?.leads ?? 0} delta={8} deltaText="vs last month" icon={BriefcaseBusiness} bg="bg-[#E0F2FE]" text="text-[#3b82f6]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Total Contacts" value={overviewData?.contacts ?? 0} delta={12} deltaText="vs last month" icon={UsersRound} bg="bg-[#D9F5F1]" text="text-[#009E92]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Total Accounts" value={overviewData?.accounts ?? 0} delta={5} deltaText="vs last month" icon={Wallet} bg="bg-[#FEF3C7]" text="text-[#e59e0b]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Total Opportunities" value={overviewData?.opportunities ?? 0} delta={18} deltaText="vs last month" icon={Handshake} bg="bg-[#DCFCE7]" text="text-[#22c55e]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Pipeline Value" value={formatCurrency(overviewData?.pipelineValue ?? 0)} delta={22} deltaText="vs last month" icon={CircleDollarSign} bg="bg-[#EDE9FE]" text="text-[#7c3aed]" className="min-w-[175px] flex-1" />
+                  </>
+                ) : activeDashboard === 'RECRUITER' ? (
+                  <>
+                    <SummaryCard label="Candidates" value={overviewData?.candidates ?? 0} delta={10} deltaText="vs last month" icon={UsersRound} bg="bg-[#E0F2FE]" text="text-[#3b82f6]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Open Jobs" value={overviewData?.jobs ?? 0} delta={6} deltaText="vs last month" icon={BriefcaseBusiness} bg="bg-[#D9F5F1]" text="text-[#009E92]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Interviews" value={overviewData?.benchInterviews ?? 0} delta={15} deltaText="vs last month" icon={Clock3} bg="bg-[#FEF3C7]" text="text-[#e59e0b]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Offers" value={overviewData?.benchOffers ?? 0} delta={12} deltaText="vs last month" icon={Handshake} bg="bg-[#DCFCE7]" text="text-[#22c55e]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Placements" value={overviewData?.placements ?? 0} delta={20} deltaText="vs last month" icon={CheckCheck} bg="bg-[#EDE9FE]" text="text-[#7c3aed]" className="min-w-[175px] flex-1" />
+                  </>
+                ) : activeDashboard === 'AITEAM' ? (
+                  <>
+                    <SummaryCard label="AI Projects" value={overviewData?.aiProjects ?? 0} delta={14} deltaText="vs last month" icon={BriefcaseBusiness} bg="bg-[#E0F2FE]" text="text-[#3b82f6]" className="min-w-[175px] flex-1" />
+                    <SummaryCard label="Total Tasks" value={overviewData?.tasks ?? 0} delta={20} deltaText="vs last month" icon={Clock3} bg="bg-[#D9F5F1]" text="text-[#009E92]" className="min-w-[175px] flex-1" />
+                  </>
+                ) : isAdminOrManager ? (
                   <>
                     <SummaryCard label="Total Users" value={dashboardData?.summary.totalUsers ?? 0} delta={5} deltaText="vs last month" icon={UsersRound} bg="bg-[#E0F2FE]" text="text-[#3b82f6]" className="min-w-[175px] flex-1" />
                     <SummaryCard label="Total Submissions" value={dashboardData?.summary.totalSubmissions ?? 0} delta={14} deltaText="vs last month" icon={Mail} bg="bg-[#D9F5F1]" text="text-[#009E92]" className="min-w-[175px] flex-1" />
@@ -391,7 +448,7 @@ export function Dashboard() {
               </div>
 
               {/* User Performance Comparison Table */}
-              {isAdminOrManager && dashboardData && (
+              {activeDashboard === 'BENCHSALES' && isAdminOrManager && dashboardData && (
                 <div className="crm-card p-5">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-[16px] font-black text-[#071B4A]">User Performance Overview</h2>
@@ -458,8 +515,28 @@ export function Dashboard() {
                 </div>
               )}
 
-              {/* Charts (Pipeline Funnel, Rounds selections, Top Vendors) */}
-              {dashboardData && (
+              {/* Pipeline charts (only for BENCHSALES) */}
+              {activeDashboard === 'BENCHSALES' && dashboardData && (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                  <ActionDashboardCard title="Action Required" items={dashboardData.summary.attention ?? []} onNavigate={navigate} />
+                  <ActionDashboardCard title="Today's Activity" items={dashboardData.summary.todayActions ?? []} onNavigate={navigate} />
+                  <div className="crm-card p-4">
+                    <h3 className="mb-3 text-[14px] font-black text-[#071B4A]">Bench Aging</h3>
+                    <div className="space-y-2.5">
+                      {(dashboardData.summary.agingBuckets ?? []).map((bucket) => {
+                        const max = Math.max(...(dashboardData.summary.agingBuckets ?? []).map((item) => item.count), 1);
+                        return <button key={bucket.label} onClick={() => navigate(`/bench?aging=${bucket.min}-${bucket.max === Infinity ? 'plus' : bucket.max}`)} className="group flex w-full items-center gap-2 text-left text-[11px] text-slate-600">
+                          <span className="w-[68px] shrink-0 font-semibold">{bucket.label}</span>
+                          <span className="h-5 flex-1 overflow-hidden rounded bg-slate-100"><span className="block h-full rounded bg-[#009E92] transition group-hover:bg-[#007f75]" style={{ width: `${Math.max(bucket.count ? 8 : 0, bucket.count / max * 100)}%` }} /></span>
+                          <strong className="w-6 text-right text-[#071B4A]">{bucket.count}</strong>
+                        </button>;
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDashboard === 'BENCHSALES' && dashboardData && (
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                   
                   {/* Dynamic CSS Funnel Chart */}
@@ -556,27 +633,7 @@ export function Dashboard() {
                 </div>
               )}
 
-              {dashboardData && (
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                  <ActionDashboardCard title="Action Required" items={dashboardData.summary.attention ?? []} onNavigate={navigate} />
-                  <ActionDashboardCard title="Today's Activity" items={dashboardData.summary.todayActions ?? []} onNavigate={navigate} />
-                  <div className="crm-card p-4">
-                    <h3 className="mb-3 text-[14px] font-black text-[#071B4A]">Bench Aging</h3>
-                    <div className="space-y-2.5">
-                      {(dashboardData.summary.agingBuckets ?? []).map((bucket) => {
-                        const max = Math.max(...(dashboardData.summary.agingBuckets ?? []).map((item) => item.count), 1);
-                        return <button key={bucket.label} onClick={() => navigate(`/bench?aging=${bucket.min}-${bucket.max === Infinity ? 'plus' : bucket.max}`)} className="group flex w-full items-center gap-2 text-left text-[11px] text-slate-600">
-                          <span className="w-[68px] shrink-0 font-semibold">{bucket.label}</span>
-                          <span className="h-5 flex-1 overflow-hidden rounded bg-slate-100"><span className="block h-full rounded bg-[#009E92] transition group-hover:bg-[#007f75]" style={{ width: `${Math.max(bucket.count ? 8 : 0, bucket.count / max * 100)}%` }} /></span>
-                          <strong className="w-6 text-right text-[#071B4A]">{bucket.count}</strong>
-                        </button>;
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {dashboardData && (
+              {activeDashboard === 'BENCHSALES' && dashboardData && (
                 <div className="crm-card p-4">
                   <div className="mb-3 flex items-center justify-between"><h3 className="text-[14px] font-black text-[#071B4A]">Conversion Metrics</h3><span className="text-[10px] font-semibold text-slate-400">Selected dashboard period</span></div>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -586,7 +643,7 @@ export function Dashboard() {
               )}
 
               {/* Recent Activities feed / Recruiters Own Dashboard layout */}
-              {isAdminOrManager ? (
+              {activeDashboard === 'BENCHSALES' && isAdminOrManager ? (
                 dashboardData && (
                   <div className="crm-card p-5">
                     <div className="mb-4 flex items-center justify-between">
@@ -638,7 +695,7 @@ export function Dashboard() {
                 )
               ) : (
                 // Non-admin Recruiter Layout (Self Overview)
-                dashboardData && dashboardData.recruiters[0] && (
+                dashboardData && dashboardData.recentActivities && (
                   <div className="crm-card p-5">
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-[16px] font-black text-[#071B4A]">Recent Activities</h3>
@@ -1036,7 +1093,7 @@ export function Dashboard() {
 }
 
 // Summary Card helper component
-function SummaryCard({ label, value, delta, deltaText, icon: Icon, bg, text, className = '' }: { label: string; value: string | number; delta: number; deltaText: string; icon: any; bg: string; text: string; className?: string }) {
+function SummaryCard({ label, value, icon: Icon, bg, text, className = '' }: { label: string; value: string | number; delta?: number; deltaText?: string; icon: any; bg: string; text: string; className?: string }) {
   return (
     <div className={`crm-card p-4 flex-shrink-0 ${className}`}>
       <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-full ${bg}`}>
@@ -1044,10 +1101,6 @@ function SummaryCard({ label, value, delta, deltaText, icon: Icon, bg, text, cla
       </div>
       <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 truncate">{label}</div>
       <div className="mt-2 text-[22px] font-black leading-none text-[#071B4A] truncate">{String(value)}</div>
-      <div className="mt-2.5 flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
-        <ArrowUpRight className="h-3.5 w-3.5" />
-        <span>+{delta}% {deltaText}</span>
-      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { UserCheck, ShieldAlert, Plus, Edit3, Trash2, Mail, AtSign, KeyRound } from 'lucide-react';
+import { UserCheck, ShieldAlert, Plus, Edit3, Trash2, Mail, AtSign, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +15,7 @@ type UserRow = {
   permissions?: string[] | null;
   isActive?: boolean;
   avatarUrl?: string;
+  passwordText?: string;
   createdAt?: string;
 };
 
@@ -35,10 +36,17 @@ export function UsersPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('');
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [managerId, setManagerId] = useState('');
+  const [dashboardType, setDashboardType] = useState('BENCHSALES');
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFrom, setSmtpFrom] = useState('');
 
   const fetchUsers = async () => {
     try {
@@ -58,10 +66,17 @@ export function UsersPage() {
     setUsername('');
     setEmail('');
     setPassword('');
+    setShowPassword(false);
     setRole('');
     setPermissions([]);
     setIsActive(true);
     setManagerId('');
+    setDashboardType('BENCHSALES');
+    setSmtpHost('');
+    setSmtpPort('');
+    setSmtpUser('');
+    setSmtpPass('');
+    setSmtpFrom('');
     setDialogOpen(true);
   };
 
@@ -70,11 +85,18 @@ export function UsersPage() {
     setName(user.name);
     setUsername(user.username ?? '');
     setEmail(user.email);
-    setPassword('');
+    setPassword(user.passwordText ?? '');
+    setShowPassword(false);
     setRole(user.role);
     setPermissions(effectivePermissions(user.role, user.permissions));
     setIsActive(user.isActive !== false);
     setManagerId((user as any).managerId ?? '');
+    setDashboardType((user as any).dashboardType ?? 'BENCHSALES');
+    setSmtpHost((user as any).smtpHost ?? '');
+    setSmtpPort((user as any).smtpPort ? String((user as any).smtpPort) : '');
+    setSmtpUser((user as any).smtpUser ?? '');
+    setSmtpPass((user as any).smtpPass ?? '');
+    setSmtpFrom((user as any).smtpFrom ?? '');
     setDialogOpen(true);
   };
 
@@ -106,6 +128,12 @@ export function UsersPage() {
         permissions: role === 'SUPER_ADMIN' ? ALL_PERMISSION_KEYS : permissions,
         isActive,
         managerId: managerId || null,
+        dashboardType,
+        smtpHost: smtpHost.trim() || null,
+        smtpPort: smtpPort.trim() ? Number(smtpPort.trim()) : null,
+        smtpUser: smtpUser.trim() || null,
+        smtpPass: smtpPass.trim() || null,
+        smtpFrom: smtpFrom.trim() || null,
       };
       if (password) payload.password = password;
       if (editing) {
@@ -177,12 +205,56 @@ export function UsersPage() {
             <Field label="Full Name *"><input required name="europa-new-full-name" autoComplete="off" className="crm-input" value={name} onChange={(event) => setName(event.target.value)} /></Field>
             <Field label="Username *"><input required name="europa-new-username" autoComplete="off" pattern="[A-Za-z0-9._-]+" className="crm-input" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="e.g. john.smith" /></Field>
             <Field label="Email Address *"><input required name="europa-new-email" autoComplete="off" type="email" className="crm-input" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
-            <Field label={editing ? 'New Password (optional)' : 'Password *'}><input required={!editing} name="europa-new-password" autoComplete="new-password" minLength={8} type="password" className="crm-input" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={editing ? 'Leave blank to keep current password' : 'Minimum 8 characters'} /></Field>
+            <Field label="Password">
+              <div className="relative">
+                <input
+                  required={!editing}
+                  name="europa-new-password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  type={showPassword ? 'text' : 'password'}
+                  className="crm-input pr-10"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={editing ? 'Leave blank to keep current password' : 'Minimum 8 characters'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </Field>
             <Field label="Access Role *"><select required className="crm-input" value={role} onChange={(event) => changeRole(event.target.value)}><option value="">Select access role</option>{roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
-            {role === 'BENCHSALES' && (
-              <Field label="Manager (Optional)"><select className="crm-input" value={managerId} onChange={(event) => setManagerId(event.target.value)}><option value="">None (Self-managed)</option>{potentialManagers.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.role})</option>)}</select></Field>
-            )}
-            <label className="flex items-center gap-3 self-end rounded-lg border border-[#E4ECF3] px-4 py-3 text-sm font-extrabold text-slate-800"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="h-5 w-5 accent-[#009E92]" /> Active login</label>
+            <Field label="Default Dashboard *">
+              <select
+                required
+                className="crm-input"
+                value={dashboardType}
+                onChange={(event) => setDashboardType(event.target.value)}
+              >
+                <option value="BENCHSALES">Bench Sales Dashboard</option>
+                <option value="SALES">Sales Dashboard</option>
+                <option value="RECRUITER">Recruitment Dashboard</option>
+                <option value="AITEAM">AI Team Dashboard</option>
+              </select>
+            </Field>
+            <label className="flex items-center gap-3 rounded-lg border border-[#E4ECF3] px-4 py-3 text-sm font-extrabold text-slate-800"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="h-5 w-5 accent-[#009E92]" /> Active login</label>
+
+            <div className="col-span-full rounded-xl border border-[#E4ECF3] bg-slate-50/70 p-4">
+              <h3 className="text-sm font-extrabold text-slate-900">Personal SMTP Server Setup</h3>
+              <p className="mt-1 text-xs font-medium text-slate-600">Configure personal mail server credentials to send emails from your own account.</p>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="SMTP Host"><input name="smtp-host" className="crm-input bg-white" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="e.g. smtp.gmail.com" /></Field>
+                <Field label="SMTP Port"><input name="smtp-port" className="crm-input bg-white" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="e.g. 587" /></Field>
+                <Field label="SMTP Username"><input name="smtp-user" className="crm-input bg-white" type="email" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} placeholder="e.g. user@gmail.com" /></Field>
+                <Field label="SMTP Password"><input name="smtp-pass" className="crm-input bg-white" type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} placeholder="Enter SMTP password" /></Field>
+                <Field label="From Address"><input name="smtp-from" className="crm-input bg-white" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} placeholder="e.g. Sender Name <user@gmail.com>" /></Field>
+              </div>
+            </div>
 
             <div className="col-span-full rounded-xl border border-[#E4ECF3] bg-slate-50/70 p-4">
               <div className="flex items-center justify-between gap-3">

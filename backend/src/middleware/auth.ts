@@ -9,6 +9,11 @@ export type AuthenticatedUser = {
   email: string;
   role: string;
   permissions: unknown;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpPass?: string | null;
+  smtpFrom?: string | null;
 };
 
 export function hashSessionToken(token: string) {
@@ -38,6 +43,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       email: session.user.email,
       role: session.user.role,
       permissions: session.user.permissions,
+      smtpHost: session.user.smtpHost,
+      smtpPort: session.user.smtpPort,
+      smtpUser: session.user.smtpUser,
+      smtpPass: session.user.smtpPass,
+      smtpFrom: session.user.smtpFrom,
     } satisfies AuthenticatedUser;
     res.locals.authSessionId = session.id;
     next();

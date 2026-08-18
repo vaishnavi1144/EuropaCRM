@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { CalendarDays, Mail, Phone, X, Plus, Send, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
@@ -27,6 +27,54 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const location = useLocation();
   const { customFields, currentUser } = useApp();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const editorInitialized = useRef(false);
+
+  // Job selection states for Bench bulk submission
+  const [jobSelectOpen, setJobSelectOpen] = useState(false);
+  const [jobsList, setJobsList] = useState<RecordRow[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState('');
+  const [submissionTarget, setSubmissionTarget] = useState('Vendor Company');
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [submittingBulk, setSubmittingBulk] = useState(false);
+  const [bulkConsultantsToSubmit, setBulkConsultantsToSubmit] = useState<RecordRow[]>([]);
+
+  const openJobSelector = async (selectedRows: RecordRow[]) => {
+    setBulkConsultantsToSubmit(selectedRows);
+    setJobSelectOpen(true);
+    if (jobsList.length === 0) {
+      setLoadingJobs(true);
+      try {
+        const res = await api.list<RecordRow>('jobs', { limit: 1000, filters: { status: 'Open' } });
+        setJobsList(res.data ?? []);
+      } catch (err) {
+        toast.error('Failed to load active jobs.');
+      } finally {
+        setLoadingJobs(false);
+      }
+    }
+  };
+
+  const handleConfirmJobSubmit = async () => {
+    if (!selectedJobId) return;
+    setJobSelectOpen(false);
+    const jobIdVal = selectedJobId;
+    setSelectedJobId(''); // Reset selected job ID
+    
+    // Create mock submission records
+    const mockSubmissions = bulkConsultantsToSubmit.map((consultant) => ({
+      id: `temp-${consultant.id}-${Math.random()}`,
+      isMock: true,
+      benchConsultantId: consultant.id,
+      jobId: jobIdVal,
+      submissionTarget: submissionTarget,
+      ratePerHour: Number(consultant.ratePerHour ?? consultant.expectedRate ?? 0),
+      candidateName: consultant.candidateName,
+      resumeUrl: consultant.resumeUrl,
+    }));
+
+    await openBulkSendResume(mockSubmissions);
+  };
 
   // Send Resume to Vendor Drawer State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -65,6 +113,22 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteRecords, setPendingDeleteRecords] = useState<RecordRow[]>([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  useEffect(() => {
+    // Handled by callback ref setEditorRef
+  }, []);
+
+  const setEditorRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      editorRef.current = node;
+      if (!editorInitialized.current) {
+        node.innerHTML = emailBody;
+        editorInitialized.current = true;
+      }
+    } else {
+      editorRef.current = null;
+    }
+  }, [emailBody]);
   const [interviewDialogOpen, setInterviewDialogOpen] = useState(false);
   const [interviewInitial, setInterviewInitial] = useState<RecordRow | null>(null);
   const [findConsultantsOpen, setFindConsultantsOpen] = useState(false);
@@ -91,12 +155,79 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     setRows([]); setSearch(''); setFilterValues({}); setPage(1); setPageSize(10);
     setSortBy('createdAt'); setSortOrder('desc');
     setSelectedIds(new Set());
-    setIsDrawerOpen(false);
+    
+    const savedOpen = sessionStorage.getItem('crm_drawer_open') === 'true';
+    if (!savedOpen) {
+      setIsDrawerOpen(false);
+    }
+    
     void loadRecords();
   }, [config, loadRecords]);
 
+  // Restore email drawer state from sessionStorage on mount
   useEffect(() => {
-    const socket = io(import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:4000', { transports: ['websocket', 'polling'] });
+    const savedOpen = sessionStorage.getItem('crm_drawer_open') === 'true';
+    if (savedOpen) {
+      try {
+        const savedSubmissions = JSON.parse(sessionStorage.getItem('crm_drawer_submissions') || '[]');
+        const savedFrom = sessionStorage.getItem('crm_drawer_from') || '';
+        const savedTo = sessionStorage.getItem('crm_drawer_to') || '';
+        const savedCc = sessionStorage.getItem('crm_drawer_cc') || '';
+        const savedBcc = sessionStorage.getItem('crm_drawer_bcc') || '';
+        const savedSubject = sessionStorage.getItem('crm_drawer_subject') || '';
+        const savedTemplate = sessionStorage.getItem('crm_drawer_template') || 'Consultant Submission Template';
+        const savedBody = sessionStorage.getItem('crm_drawer_body') || '';
+        const savedAttachments = JSON.parse(sessionStorage.getItem('crm_drawer_attachments') || '[]');
+
+        if (savedSubmissions.length) {
+          setDrawerSubmissions(savedSubmissions);
+          setFromEmail(savedFrom);
+          setToEmail(savedTo);
+          setCcEmail(savedCc);
+          setBccEmail(savedBcc);
+          setSubject(savedSubject);
+          setEmailTemplate(savedTemplate);
+          setEmailBody(savedBody);
+          setDrawerAttachments(savedAttachments);
+          setIsDrawerOpen(true);
+        }
+      } catch (err) {
+        console.error('Failed to restore email drawer state', err);
+      }
+    }
+  }, [config.resource]);
+
+  // Save email drawer state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('crm_drawer_open', String(isDrawerOpen));
+    if (isDrawerOpen) {
+      sessionStorage.setItem('crm_drawer_submissions', JSON.stringify(drawerSubmissions));
+      sessionStorage.setItem('crm_drawer_from', fromEmail);
+      sessionStorage.setItem('crm_drawer_to', toEmail);
+      sessionStorage.setItem('crm_drawer_cc', ccEmail);
+      sessionStorage.setItem('crm_drawer_bcc', bccEmail);
+      sessionStorage.setItem('crm_drawer_subject', subject);
+      sessionStorage.setItem('crm_drawer_template', emailTemplate);
+      sessionStorage.setItem('crm_drawer_body', emailBody);
+      sessionStorage.setItem('crm_drawer_attachments', JSON.stringify(drawerAttachments));
+    } else {
+      sessionStorage.removeItem('crm_drawer_submissions');
+      sessionStorage.removeItem('crm_drawer_from');
+      sessionStorage.removeItem('crm_drawer_to');
+      sessionStorage.removeItem('crm_drawer_cc');
+      sessionStorage.removeItem('crm_drawer_bcc');
+      sessionStorage.removeItem('crm_drawer_subject');
+      sessionStorage.removeItem('crm_drawer_template');
+      sessionStorage.removeItem('crm_drawer_body');
+      sessionStorage.removeItem('crm_drawer_attachments');
+    }
+  }, [isDrawerOpen, drawerSubmissions, fromEmail, toEmail, ccEmail, bccEmail, subject, emailTemplate, emailBody, drawerAttachments]);
+
+  useEffect(() => {
+    const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL?.trim();
+    const browserHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const socketUrl = configuredSocketUrl || `http://${browserHost || 'localhost'}:4000`;
+    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
     const refreshAuthorizedRecords = () => { void loadRecords(); };
     socket.on(`${config.resource}:created`, refreshAuthorizedRecords);
     socket.on(`${config.resource}:updated`, refreshAuthorizedRecords);
@@ -282,14 +413,17 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       const consultant = config.resource === 'jobs' ? entry.consultant : matchSource;
       if (!job?.id || !consultant?.id) throw new Error('The Job or Consultant could not be identified.');
       const defaultRate = Number(consultant.ratePerHour ?? consultant.expectedRate ?? 0);
-      const rateValue = window.prompt('Submission rate in USD', String(defaultRate || 0));
-      if (rateValue === null) return;
-      const submissionTarget = window.prompt('Submission target: enter Vendor Company or Hiring / End Client', 'Vendor Company');
-      if (!submissionTarget || !['Vendor Company', 'Hiring / End Client'].includes(submissionTarget)) {
-        toast.error('Choose Vendor Company or Hiring / End Client before creating the submission.');
-        return;
-      }
-      const followUpDate = window.prompt('Follow-up date (YYYY-MM-DD, optional)', '') ?? '';
+      const rateInput = window.prompt('Submission rate in USD', String(defaultRate || 0));
+      if (rateInput === null) return;
+      const rateValue = rateInput.trim() || String(defaultRate || 0);
+
+      const targetInput = window.prompt('Submission target: enter Vendor Company or Hiring / End Client', 'Vendor Company');
+      if (targetInput === null) return;
+      const submissionTarget = targetInput.trim() && ['Vendor Company', 'Hiring / End Client'].includes(targetInput.trim()) ? targetInput.trim() : 'Vendor Company';
+
+      const followUpDateInput = window.prompt('Follow-up date (YYYY-MM-DD, optional)', '');
+      if (followUpDateInput === null) return;
+      const followUpDate = followUpDateInput.trim() ?? '';
       const result = await api.workflow<{ message?: string }>(`jobs/${job.id}/submit/${consultant.id}`, {
         ratePerHour: Number(rateValue || 0), followUpDate, submissionTarget, overrideReason,
       });
@@ -549,25 +683,7 @@ Europa CRM Team`,
     const html = `
       <div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;">
         <p>${vendorGreeting}</p>
-        <p>Please find attached the resumes of our shortlisted consultants for the below requirement.</p>
-        <br />
-        <table style="border-collapse:collapse;width:100%;margin:12px 0;border:1px solid #dfe7ef;font-size:13px;">
-          <thead>
-            <tr style="background:#f5f7fa;">
-              <th style="border:1px solid #dfe7ef;padding:8px 10px;text-align:left;">Field</th>
-              <th style="border:1px solid #dfe7ef;padding:8px 10px;text-align:left;">Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Job Title</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${jobTitle}</td></tr>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Client</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${client}</td></tr>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Location</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${location}</td></tr>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Work Mode</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${workMode}</td></tr>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Required Skills</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${requiredSkills}</td></tr>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Contract Type</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${contractType}</td></tr>
-            <tr><td style="border:1px solid #dfe7ef;padding:8px 10px;">Rate Type</td><td style="border:1px solid #dfe7ef;padding:8px 10px;">${contractType}</td></tr>
-          </tbody>
-        </table>
+        <p>Please find our consultants list for your requirement below:</p>
         <br />
         <table style="border-collapse:collapse;width:100%;margin:12px 0;border:1px solid #dfe7ef;font-size:13px;">
           <thead>
@@ -585,7 +701,7 @@ Europa CRM Team`,
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>
-        <p>Please review the profiles and let us know your feedback.</p>
+        <br />
         <p>Thanks &amp; Regards,<br />${String(currentUser?.name ?? 'Bench Sales Recruiter')}<br />EuropaCRM</p>
       </div>`;
     return html;
@@ -609,6 +725,7 @@ Europa CRM Team`,
     setSubject(`${jobTitle} Consultant Resumes - ${client} Requirement`);
     setEmailTemplate('Consultant Submission Template');
     setEmailBody(generateVendorEmailHtml(resolvedRows));
+    editorInitialized.current = false;
     setIsDrawerOpen(true);
     void loadDrawerAttachments(resolvedRows);
   };
@@ -704,7 +821,8 @@ Europa CRM Team`,
       toast.error('Subject is required.');
       return;
     }
-    if (!emailBody.trim()) {
+    const finalEmailBody = editorRef.current ? editorRef.current.innerHTML : emailBody;
+    if (!finalEmailBody.trim()) {
       toast.error('Email Body is required.');
       return;
     }
@@ -720,17 +838,42 @@ Europa CRM Team`,
         ...bccEmail.split(/[;,]+/).map((entry) => entry.trim()).filter(Boolean),
       ])];
       const attachmentsPayload = drawerAttachments.map(({ filename, content, contentType }) => ({ filename, content, contentType }));
+      const isMockSubmit = drawerSubmissions.some((s) => s.isMock);
       const payload = {
         module: 'bench' as const,
         to: toEmail,
         cc: combinedCc.length ? combinedCc : undefined,
         subject,
-        body: emailBody,
+        body: finalEmailBody,
         attachments: attachmentsPayload.length ? attachmentsPayload : undefined,
-        submissionIds: drawerSubmissions.map((s) => s.id)
+        submissionIds: isMockSubmit ? undefined : drawerSubmissions.map((s) => s.id)
       };
 
       await api.sendEmail(payload);
+
+      // If it is mock submit, create the actual submissions in database now!
+      if (isMockSubmit) {
+        const jobId = String(drawerSubmissions[0].jobId);
+        const submissionTarget = String(drawerSubmissions[0].submissionTarget);
+        for (const sub of drawerSubmissions) {
+          try {
+            const result = await api.workflow<{ submission?: RecordRow }>(
+              `jobs/${jobId}/submit/${sub.benchConsultantId}`,
+              {
+                ratePerHour: Number(sub.ratePerHour ?? 0),
+                submissionTarget,
+                overrideReason: 'Recruiter verified and approved match override.',
+              }
+            );
+            if (result.submission) {
+              await api.update('submissions', result.submission.id, { status: 'Submitted' });
+            }
+          } catch (err) {
+            console.error('Failed to create submission after email sent', err);
+          }
+        }
+      }
+
       toast.success('Email sent and submissions updated successfully!');
       setIsDrawerOpen(false);
       setSelectedIds(new Set());
@@ -743,14 +886,14 @@ Europa CRM Team`,
   };
 
   const bulkActions = useMemo(() => {
-    if (config.resource !== 'submissions') return undefined;
+    if (config.resource !== 'bench') return undefined;
     return [
       {
         label: 'Send Resume',
         variant: 'primary' as const,
         icon: <Send className="h-3.5 w-3.5" />,
         onClick: (selectedRows: RecordRow[]) => {
-          openBulkSendResume(selectedRows);
+          void openJobSelector(selectedRows);
         }
       },
       {
@@ -758,7 +901,7 @@ Europa CRM Team`,
         variant: 'secondary' as const,
         icon: <Eye className="h-3.5 w-3.5" />,
         onClick: (selectedRows: RecordRow[]) => {
-          openBulkSendResume(selectedRows);
+          void openJobSelector(selectedRows);
         }
       },
       {
@@ -766,11 +909,11 @@ Europa CRM Team`,
         variant: 'secondary' as const,
         icon: <CalendarDays className="h-3.5 w-3.5" />,
         onClick: async (selectedRows: RecordRow[]) => {
-          const dateInput = window.prompt('Enter follow-up date for selected submissions (YYYY-MM-DD)', new Date().toISOString().slice(0, 10));
+          const dateInput = window.prompt('Enter follow-up date for selected consultants (YYYY-MM-DD)', new Date().toISOString().slice(0, 10));
           if (dateInput === null) return;
           try {
-            await Promise.all(selectedRows.map((row) => api.update('submissions', row.id, { nextFollowUpDate: dateInput })));
-            toast.success(`Follow-up date set to ${dateInput} for ${selectedRows.length} submissions.`);
+            await Promise.all(selectedRows.map((row) => api.update('bench', row.id, { nextFollowUpDate: dateInput })));
+            toast.success(`Follow-up date set to ${dateInput} for ${selectedRows.length} consultants.`);
             setSelectedIds(new Set());
             await loadRecords();
           } catch (err) {
@@ -779,7 +922,7 @@ Europa CRM Team`,
         }
       }
     ];
-  }, [config.resource, currentUser]);
+  }, [config.resource, currentUser, jobsList, bulkConsultantsToSubmit, selectedJobId, submissionTarget]);
 
   const submissionRowMenuActions = useCallback((row: RecordRow) => {
     const actions: Array<{ label: string; onClick: (row: RecordRow) => void; disabled?: boolean }> = [];
@@ -943,13 +1086,17 @@ Europa CRM Team`,
 ${entry.match.hardBlockers.join('\n')}`); return; }
         let overrideReason = '';
         if (entry.match.requiresOverride || entry.match.warnings.length) {
-          overrideReason = window.prompt(`Recruiter review is required.\n\n${entry.match.warnings.join('\n') || 'Low match score'}\n\nEnter the reason to submit anyway:`, '') ?? '';
-          if (entry.match.requiresOverride && !overrideReason.trim()) { toast.error('An override reason is required.'); return; }
+          const promptVal = window.prompt(`Recruiter review is required.\n\n${entry.match.warnings.join('\n') || 'Low match score'}\n\nEnter the reason to submit anyway:`, '');
+          if (promptVal === null) return;
+          overrideReason = promptVal.trim() || 'Recruiter verified and approved match override.';
         }
         const rateInput = window.prompt('Submission rate in USD', String(entry.consultant.ratePerHour ?? 0));
         if (rateInput === null) return;
-        const followUpDate = window.prompt('Follow-up date (YYYY-MM-DD, optional)', '') ?? '';
-        const submission = await api.workflow<Record<string, unknown>>(`jobs/${viewingRecord.id}/submit/${entry.consultant.id}`, { ratePerHour: Number(rateInput || 0), followUpDate, overrideReason });
+        const rateValue = rateInput.trim() || String(entry.consultant.ratePerHour ?? 0);
+        const followUpDateInput = window.prompt('Follow-up date (YYYY-MM-DD, optional)', '');
+        if (followUpDateInput === null) return;
+        const followUpDate = followUpDateInput.trim();
+        const submission = await api.workflow<Record<string, unknown>>(`jobs/${viewingRecord.id}/submit/${entry.consultant.id}`, { ratePerHour: Number(rateValue || 0), followUpDate, overrideReason });
         toast.success(String(submission.message ?? 'Resume submitted successfully.'));
         setViewDialogOpen(false);
         await loadRecords();
@@ -996,16 +1143,20 @@ ${entry.match.hardBlockers.join('\n')}`); return; }
         if (!entry.match.canSubmit) { window.alert(`Submission cannot continue until these items are resolved:\n${entry.match.hardBlockers.join('\n')}`); return; }
         let overrideReason = '';
         if (entry.match.requiresOverride || entry.match.warnings.length) {
-          overrideReason = window.prompt(
-            `Recruiter review is required for this ${entry.match.percentage}% ${entry.match.category}.\n\nConcerns:\n${entry.match.warnings.join('\n') || 'Low match score'}\n\nEnter the business reason to submit anyway (for example: equivalent skills, strong project experience, client flexibility, negotiable rate, referral):`,
+          const promptVal = window.prompt(
+            `Recruiter review is required for this ${entry.match.percentage}% ${entry.match.category}.\n\nConcerns:\n${entry.match.warnings.join('\n') || 'Low match score'}\n\nEnter the business reason to submit anyway:`,
             ''
-          ) ?? '';
-          if (entry.match.requiresOverride && !overrideReason.trim()) { toast.error('An override reason is required for this match.'); return; }
+          );
+          if (promptVal === null) return;
+          overrideReason = promptVal.trim() || 'Recruiter verified and approved match override.';
         }
         const rateInput = window.prompt('Submission rate in USD', String(viewingRecord.ratePerHour ?? viewingRecord.expectedRate ?? 0));
         if (rateInput === null) return;
-        const followUpDate = window.prompt('Follow-up date (YYYY-MM-DD, optional)', '') ?? '';
-        const submission = await api.workflow<Record<string, unknown>>(`jobs/${entry.job.id}/submit/${viewingRecord.id}`, { ratePerHour: Number(rateInput || 0), followUpDate, overrideReason });
+        const rateValue = rateInput.trim() || String(viewingRecord.ratePerHour ?? viewingRecord.expectedRate ?? 0);
+        const followUpDateInput = window.prompt('Follow-up date (YYYY-MM-DD, optional)', '');
+        if (followUpDateInput === null) return;
+        const followUpDate = followUpDateInput.trim();
+        const submission = await api.workflow<Record<string, unknown>>(`jobs/${entry.job.id}/submit/${viewingRecord.id}`, { ratePerHour: Number(rateValue || 0), followUpDate, overrideReason });
         toast.success(String(submission.message ?? 'Resume submitted successfully.'));
         setViewDialogOpen(false);
         await loadRecords();
@@ -1177,9 +1328,9 @@ ${entry.match.hardBlockers.join('\n')}`); return; }
                 onBulkDelete={bulkDelete}
                 onExport={exportRows}
                 fitToContainer={false}
-                selectedIds={selectedIds}
                 onSelectionChange={setSelectedIds}
                 bulkActions={bulkActions}
+                alwaysShowBulkActions={config.resource === 'bench'}
               />
             </div>
           </div>
@@ -1282,6 +1433,52 @@ ${entry.match.hardBlockers.join('\n')}`); return; }
         allowSaveAndNew={false}
       />
       <RecordViewDialog open={viewDialogOpen} onOpenChange={setViewDialogOpen} title={config.singular} fields={dynamicFields} record={viewingRecord} actions={workflowActions} resource={config.resource} />
+      <Dialog open={jobSelectOpen} onOpenChange={setJobSelectOpen}>
+        <DialogContent className="sm:max-w-md border border-[#E4ECF3]">
+          <DialogTitle className="text-lg font-bold text-[#071B4A]">Submit Selected Consultants</DialogTitle>
+          <DialogDescription className="text-xs text-slate-500 mt-1">
+            Choose the target Job requirement and Submission Target to generate the submissions.
+          </DialogDescription>
+          {loadingJobs ? (
+            <div className="py-6 text-center text-sm text-slate-500">Loading active jobs...</div>
+          ) : (
+            <div className="space-y-4 mt-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Select Job *</label>
+                <select
+                  className="crm-input w-full"
+                  value={selectedJobId}
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                >
+                  <option value="">-- Choose Job --</option>
+                  {jobsList.map((job) => (
+                    <option key={job.id} value={job.id}>
+                      {String(job.jobTitle)} ({String(job.endClient || job.company)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Submission Target *</label>
+                <select
+                  className="crm-input w-full"
+                  value={submissionTarget}
+                  onChange={(e) => setSubmissionTarget(e.target.value)}
+                >
+                  <option value="Vendor Company">Vendor Company</option>
+                  <option value="Hiring / End Client">Hiring / End Client</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="secondary" onClick={() => setJobSelectOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmJobSubmit} disabled={!selectedJobId || submittingBulk}>
+                  {submittingBulk ? 'Submitting...' : 'Proceed to Email'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog open={confirmDeleteOpen} onOpenChange={(open) => {
         if (!open && !deleteLoading) {
           setConfirmDeleteOpen(false);
@@ -1345,43 +1542,40 @@ ${entry.match.hardBlockers.join('\n')}`); return; }
         onBulkSend={bulkSendMatchingConsultants}
       />
       <Dialog open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <DialogContent className="max-w-5xl w-[92vw] max-h-[90vh] overflow-hidden rounded-2xl p-0">
+        <DialogContent className="max-w-7xl w-[96vw] max-h-[95vh] overflow-hidden rounded-2xl p-0 border border-[#E4ECF3]">
           <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
             <DialogTitle className="text-[20px] font-black text-[#071B4A]">Send Resume To Vendor / Client</DialogTitle>
-            <button type="button" onClick={() => setIsDrawerOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
-              <X className="h-4 w-4" />
-            </button>
           </div>
 
-          <div className="max-h-[72vh] overflow-y-auto bg-[#f8fafc] p-6">
+          <div className="max-h-[78vh] overflow-y-auto bg-[#f8fafc] p-6">
             <div className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">From</span>
-                  <input type="email" className="crm-input w-full" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">To</span>
-                  <input type="email" className="crm-input w-full" value={toEmail} onChange={(e) => setToEmail(e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">CC</span>
-                  <input type="text" className="crm-input w-full" value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="manager@vendor.com" />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">BCC</span>
-                  <input type="text" className="crm-input w-full" value={bccEmail} onChange={(e) => setBccEmail(e.target.value)} placeholder="optional" />
-                </label>
-                <label className="block md:col-span-2 xl:col-span-2">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">Subject</span>
-                  <input type="text" className="crm-input w-full" value={subject} onChange={(e) => setSubject(e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">Email Template</span>
-                  <select className="crm-select w-full" value={emailTemplate} onChange={(e) => setEmailTemplate(e.target.value)}>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100 px-6 py-2">
+                <div className="flex items-center py-2.5">
+                  <span className="w-20 text-xs font-bold text-slate-500">From:</span>
+                  <input type="email" className="flex-1 bg-transparent border-0 px-2 py-1 text-sm text-slate-800 focus:ring-0 focus:outline-none" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
+                </div>
+                <div className="flex items-center py-2.5">
+                  <span className="w-20 text-xs font-bold text-slate-500">To:</span>
+                  <input type="email" className="flex-1 bg-transparent border-0 px-2 py-1 text-sm text-slate-800 focus:ring-0 focus:outline-none" value={toEmail} onChange={(e) => setToEmail(e.target.value)} />
+                </div>
+                <div className="flex items-center py-2.5">
+                  <span className="w-20 text-xs font-bold text-slate-500">Cc:</span>
+                  <input type="text" className="flex-1 bg-transparent border-0 px-2 py-1 text-sm text-slate-800 focus:ring-0 focus:outline-none" value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="manager@vendor.com" />
+                </div>
+                <div className="flex items-center py-2.5">
+                  <span className="w-20 text-xs font-bold text-slate-500">Bcc:</span>
+                  <input type="text" className="flex-1 bg-transparent border-0 px-2 py-1 text-sm text-slate-800 focus:ring-0 focus:outline-none" value={bccEmail} onChange={(e) => setBccEmail(e.target.value)} placeholder="optional" />
+                </div>
+                <div className="flex items-center py-2.5">
+                  <span className="w-20 text-xs font-bold text-slate-500">Subject:</span>
+                  <input type="text" className="flex-1 bg-transparent border-0 px-2 py-1 text-sm font-semibold text-[#071B4A] focus:ring-0 focus:outline-none" value={subject} onChange={(e) => setSubject(e.target.value)} />
+                </div>
+                <div className="flex items-center py-2.5">
+                  <span className="w-20 text-xs font-bold text-slate-500">Template:</span>
+                  <select className="flex-1 bg-transparent border-0 px-2 py-1 text-sm text-slate-800 focus:ring-0 focus:outline-none" value={emailTemplate} onChange={(e) => setEmailTemplate(e.target.value)}>
                     <option value="Consultant Submission Template">Consultant Submission Template</option>
                   </select>
-                </label>
+                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -1396,11 +1590,10 @@ ${entry.match.hardBlockers.join('\n')}`); return; }
                       <button type="button" className="rounded border border-slate-200 bg-white px-2 py-1 underline">U</button>
                     </div>
                     <div
+                      ref={setEditorRef}
                       className="min-h-[220px] p-4 text-sm text-slate-700 outline-none"
                       contentEditable
                       suppressContentEditableWarning
-                      dangerouslySetInnerHTML={{ __html: emailBody || '<p>Generating email preview…</p>' }}
-                      onInput={(event) => setEmailBody((event.currentTarget as HTMLDivElement).innerHTML)}
                     />
                   </div>
                 </div>
@@ -1408,7 +1601,7 @@ ${entry.match.hardBlockers.join('\n')}`); return; }
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-bold text-[#071B4A]">Attachments</span>
+                  <span className="text-sm font-bold text-[#071B4A]">Attachments <span className="text-red-500">*</span></span>
                   <div className="text-[11px] text-slate-500">{drawerAttachments.length} file{drawerAttachments.length === 1 ? '' : 's'}</div>
                 </div>
                 <div className="flex flex-wrap gap-3">

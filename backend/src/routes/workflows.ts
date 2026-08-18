@@ -358,7 +358,7 @@ workflowsRouter.post('/jobs/:jobId/submit/:benchId', requirePermission('submissi
       if (!['Open', 'Active'].includes(String(job.status))) throw Object.assign(new Error('Only an active Job can receive submissions.'), { statusCode: 409 });
       if (job.expiryDate && job.expiryDate < new Date().toISOString().slice(0, 10)) throw Object.assign(new Error('This Job has expired.'), { statusCode: 409 });
       if (Number(job.vacancyCount ?? 0) < 1) throw Object.assign(new Error('This Job has no remaining vacancies.'), { statusCode: 409 });
-      if (!['Active', 'Available'].includes(String(consultant.marketingStatus))) throw Object.assign(new Error('Only an active Bench Consultant can be submitted.'), { statusCode: 409 });
+      if (!['Active', 'Available', 'Submitted'].includes(String(consultant.marketingStatus))) throw Object.assign(new Error('Only an active Bench Consultant can be submitted.'), { statusCode: 409 });
 
       const duplicate = await tx.submission.findFirst({
         where: {

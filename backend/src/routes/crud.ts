@@ -10,27 +10,27 @@ import { calculateRequirementMatch } from '../lib/matching.js';
 import { normalizeJobPayload } from '../lib/payloadNormalization.js';
 
 const resources = {
-  leads: { model: 'lead', type: 'Lead', search: ['name','company','email','status','ownerName'] },
-  contacts: { model: 'contact', type: 'Contact', search: ['name','company','email','contactType','ownerName'] },
-  accounts: { model: 'account', type: 'Account', search: ['accountName','industry','email','ownerName','status'] },
-  opportunities: { model: 'opportunity', type: 'Opportunity', search: ['opportunityName','accountName','stage','ownerName'] },
-  campaigns: { model: 'campaign', type: 'Campaign', search: ['campaignName','type','status','ownerName'] },
-  activities: { model: 'activity', type: 'Activity', search: ['activity','description','relatedTo','type','status','ownerName'] },
-  candidates: { model: 'candidate', type: 'Candidate', search: ['name','email','skills','status','ownerName'] },
-  jobs: { model: 'job', type: 'Job', search: ['jobTitle','skillsRequired','company','jobType','location','status','ownerName'] },
-  interviews: { model: 'interview', type: 'Interview', search: ['candidateName','jobTitle','status','interviewer'] },
-  offers: { model: 'offer', type: 'Offer', search: ['candidateName','jobTitle','status','ownerName'] },
-  bench: { model: 'bench', type: 'Bench', search: ['candidateName','skills','visaStatus','ownerName'] },
-  submissions: { model: 'submission', type: 'Submission', search: ['candidateName','vendorCompany','jobTitle','status','ownerName'] },
-  'submission-emails': { model: 'submissionEmail', type: 'SubmissionEmail', search: ['toEmail','ccEmail','subject','status','sentBy'] },
-  'bench-interviews': { model: 'benchInterview', type: 'BenchInterview', search: ['candidateName','clientCompany','vendorCompany','jobTitle','status','interviewer','ownerName'] },
-  'bench-offers': { model: 'benchOffer', type: 'BenchOffer', search: ['candidateName','clientCompany','vendorCompany','jobTitle','status','ownerName'] },
-  requirements: { model: 'requirement', type: 'Requirement', search: ['title','clientCompany','vendorCompany','skills','status'] },
-  placements: { model: 'placement', type: 'Placement', search: ['candidateName','clientCompany','vendorCompany','status','ownerName'] },
-  'ai-projects': { model: 'aiProject', type: 'AiProject', search: ['projectName','techStack','status','leadEngineer','ownerName'] },
-  tasks: { model: 'aiTask', type: 'AiTask', search: ['taskName','projectName','status','priority','assignee'] },
-  resources: { model: 'aiResource', type: 'AiResource', search: ['name','type','allocationStatus','skillLevel','ownerName'] },
-  users: { model: 'user', type: 'User', search: ['name','username','email','role'] },
+  leads: { model: 'lead', type: 'Lead', search: ['name', 'company', 'email', 'status', 'ownerName'] },
+  contacts: { model: 'contact', type: 'Contact', search: ['name', 'company', 'email', 'contactType', 'ownerName'] },
+  accounts: { model: 'account', type: 'Account', search: ['accountName', 'industry', 'email', 'ownerName', 'status'] },
+  opportunities: { model: 'opportunity', type: 'Opportunity', search: ['opportunityName', 'accountName', 'stage', 'ownerName'] },
+  campaigns: { model: 'campaign', type: 'Campaign', search: ['campaignName', 'type', 'status', 'ownerName'] },
+  activities: { model: 'activity', type: 'Activity', search: ['activity', 'description', 'relatedTo', 'type', 'status', 'ownerName'] },
+  candidates: { model: 'candidate', type: 'Candidate', search: ['name', 'email', 'skills', 'status', 'ownerName'] },
+  jobs: { model: 'job', type: 'Job', search: ['jobTitle', 'skillsRequired', 'company', 'jobType', 'location', 'status', 'ownerName'] },
+  interviews: { model: 'interview', type: 'Interview', search: ['candidateName', 'jobTitle', 'status', 'interviewer'] },
+  offers: { model: 'offer', type: 'Offer', search: ['candidateName', 'jobTitle', 'status', 'ownerName'] },
+  bench: { model: 'bench', type: 'Bench', search: ['candidateName', 'skills', 'visaStatus', 'ownerName'] },
+  submissions: { model: 'submission', type: 'Submission', search: ['candidateName', 'vendorCompany', 'jobTitle', 'status', 'ownerName'] },
+  'submission-emails': { model: 'submissionEmail', type: 'SubmissionEmail', search: ['toEmail', 'ccEmail', 'subject', 'status', 'sentBy'] },
+  'bench-interviews': { model: 'benchInterview', type: 'BenchInterview', search: ['candidateName', 'clientCompany', 'vendorCompany', 'jobTitle', 'status', 'interviewer', 'ownerName'] },
+  'bench-offers': { model: 'benchOffer', type: 'BenchOffer', search: ['candidateName', 'clientCompany', 'vendorCompany', 'jobTitle', 'status', 'ownerName'] },
+  requirements: { model: 'requirement', type: 'Requirement', search: ['title', 'clientCompany', 'vendorCompany', 'skills', 'status'] },
+  placements: { model: 'placement', type: 'Placement', search: ['candidateName', 'clientCompany', 'vendorCompany', 'status', 'ownerName'] },
+  'ai-projects': { model: 'aiProject', type: 'AiProject', search: ['projectName', 'techStack', 'status', 'leadEngineer', 'ownerName'] },
+  tasks: { model: 'aiTask', type: 'AiTask', search: ['taskName', 'projectName', 'status', 'priority', 'assignee'] },
+  resources: { model: 'aiResource', type: 'AiResource', search: ['name', 'type', 'allocationStatus', 'skillLevel', 'ownerName'] },
+  users: { model: 'user', type: 'User', search: ['name', 'username', 'email', 'role'] },
 } as const;
 
 type ResourceName = keyof typeof resources;
@@ -115,7 +115,7 @@ crudRouter.get('/:resource', async (req, res, next) => {
     else if (ownerScope) Object.assign(where, ownerScope);
     else if (searchScope) Object.assign(where, searchScope);
     for (const [key, raw] of Object.entries(req.query)) {
-      if (['page','limit','search','sortBy','sortOrder'].includes(key) || typeof raw !== 'string' || raw === '') continue;
+      if (['page', 'limit', 'search', 'sortBy', 'sortOrder'].includes(key) || typeof raw !== 'string' || raw === '') continue;
       const field = fields.get(key);
       if (!field) continue;
       if (field.type === 'String') where[key] = { contains: raw.trim(), mode: 'insensitive' };
@@ -375,7 +375,7 @@ async function prepareData(type: string, input: unknown, previousCustomData?: un
   const data: Record<string, unknown> = {};
   const customData: Record<string, unknown> = previousCustomData && typeof previousCustomData === 'object' && !Array.isArray(previousCustomData) ? { ...(previousCustomData as Record<string, unknown>) } : {};
   for (const [key, value] of Object.entries(source)) {
-    if (['id','createdAt','updatedAt','passwordHash'].includes(key)) continue;
+    if (['id', 'createdAt', 'updatedAt', 'passwordHash'].includes(key)) continue;
     const field = fields.get(key);
     if (!field || key === 'customData') { customData[key] = value; continue; }
     if (value === '' && !field.isRequired) {
@@ -399,7 +399,10 @@ async function prepareData(type: string, input: unknown, previousCustomData?: un
       delete customData.permissions;
     }
     const password = typeof source.password === 'string' ? source.password.trim() : '';
-    if (password) data.passwordHash = hashPassword(password);
+    if (password) {
+      data.passwordHash = hashPassword(password);
+
+    }
     delete data.password;
     delete customData.password;
     if ('username' in data && typeof data.username === 'string') data.username = data.username.trim().toLowerCase();

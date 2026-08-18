@@ -27,6 +27,7 @@ export type AuthUser = {
   role: string;
   permissions?: string[] | null;
   avatarUrl?: string | null;
+  dashboardType?: string | null;
 };
 
 export function getAuthToken() {

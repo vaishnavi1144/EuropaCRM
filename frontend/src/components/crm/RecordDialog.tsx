@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
+import { useApp } from '@/context/AppContext';
 import type { FieldConfig, RecordRow } from '@/types';
 
 type RelationOption = Record<string, unknown>;
@@ -19,6 +20,7 @@ export function RecordDialog({ open, onOpenChange, title, fields, initial, onSav
   onSaveAndNew?: () => void;
   allowSaveAndNew?: boolean;
 }) {
+  const { currentUser } = useApp();
   const [values, setValues] = useState<Record<string, string>>({});
   const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
   const [saving, setSaving] = useState(false);
@@ -58,6 +60,7 @@ export function RecordDialog({ open, onOpenChange, title, fields, initial, onSav
         if (resource === 'jobs' && field.key === 'rateType' && !value) value = 'C2C';
         if (resource === 'submissions' && field.key === 'submissionTarget' && !value) value = 'Vendor Company';
         if (resource === 'submissions' && field.key === 'status' && !value) value = 'Draft';
+        if (field.key === 'ownerName' && !value && currentUser?.name) value = currentUser.name;
         next[field.key] = value;
       }
     }

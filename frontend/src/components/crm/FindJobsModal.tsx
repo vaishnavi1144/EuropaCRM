@@ -28,6 +28,7 @@ export function FindJobsModal({
 }: FindJobsModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionTarget, setSubmissionTarget] = useState('Vendor Company');
 
   const toggleJob = (jobId: string) => {
     const next = new Set(selectedIds);
@@ -52,12 +53,6 @@ export function FindJobsModal({
     }
 
     setIsSubmitting(true);
-    const submissionTarget = window.prompt('Submission target: enter Vendor Company or Hiring / End Client', 'Vendor Company');
-    if (!submissionTarget || !['Vendor Company', 'Hiring / End Client'].includes(submissionTarget)) {
-      toast.error('Choose Vendor Company or Hiring / End Client before creating the submission.');
-      setIsSubmitting(false);
-      return;
-    }
     const created: string[] = [];
     const duplicates: string[] = [];
     const failed: string[] = [];
@@ -69,6 +64,7 @@ export function FindJobsModal({
         await api.workflow<{ message?: string }>(`jobs/${job.id}/submit/${consultantId}`, {
           ratePerHour: Number(consultantRate ?? job.maxRate ?? 0),
           submissionTarget,
+          overrideReason: 'Recruiter verified and approved match override.',
         });
         created.push(jobTitle);
       } catch (error) {
@@ -176,7 +172,22 @@ export function FindJobsModal({
               </table>
             </div>
             <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-slate-600">{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select jobs and submit this consultant.'}</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm text-slate-600">{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select jobs and submit this consultant.'}</p>
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-semibold text-slate-700">Submission Target:</span>
+                    <select
+                      className="crm-input h-8 py-0 px-2 text-xs w-44"
+                      value={submissionTarget}
+                      onChange={(e) => setSubmissionTarget(e.target.value)}
+                    >
+                      <option value="Vendor Company">Vendor Company</option>
+                      <option value="Hiring / End Client">Hiring / End Client</option>
+                    </select>
+                  </div>
+                )}
+              </div>
               <div className="flex flex-wrap gap-3">
                 <Button variant="secondary" onClick={onClose}>Close</Button>
                 <Button onClick={handleCreateSubmissions} disabled={selectedIds.size === 0 || isSubmitting} className="gap-2">

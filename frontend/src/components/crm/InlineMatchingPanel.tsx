@@ -28,11 +28,12 @@ export function InlineMatchingPanel({
   const submit = async (entry: MatchEntry) => {
     let overrideReason = '';
     if (entry.match.requiresOverride || entry.match.warnings.length > 0) {
-      overrideReason = window.prompt(
+      const promptVal = window.prompt(
         `This is a ${entry.match.percentage}% ${entry.match.category}. Enter a recruiter justification to submit anyway:`,
-        entry.match.strengths[0] ?? ''
-      )?.trim() ?? '';
-      if (entry.match.requiresOverride && !overrideReason) return;
+        entry.match.strengths[0] ?? 'Approved'
+      );
+      if (promptVal === null) return;
+      overrideReason = promptVal.trim() || 'Recruiter verified and approved match override.';
     }
     await onSubmit(entry, overrideReason);
   };

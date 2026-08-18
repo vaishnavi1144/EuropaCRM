@@ -123,7 +123,7 @@ export function EmailDialog({ open, onOpenChange, onSend, initial, title = 'Send
           <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-700">Message *</span><textarea required className="crm-input min-h-40 resize-y py-2" value={body} onChange={(event) => setBody(event.target.value)} /></label>
           <input ref={fileInputRef} type="file" className="hidden" multiple onChange={(event) => handleFiles(event.target.files)} />
           <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Attachments</span>
+            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Attachments {requireAttachments && <span className="text-red-500">*</span>}</span>
             <input
               type="file"
               className="crm-input"

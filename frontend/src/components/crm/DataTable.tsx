@@ -5,7 +5,7 @@ import type { ColumnConfig, RecordRow } from '@/types';
 import { Badge, resolveBadgeTone } from '@/components/ui/Badge';
 import { formatIndianCurrency, initials } from '@/lib/utils';
 
-export function DataTable({ rows, columns, page, pageSize, total, sortBy, sortOrder, onPage, onPageSize, onSort, onEdit, onDelete, onView, onAutomation, automationLabel, rowMenuActions, rowAction, onRowClick, selectedRowId, onBulkDelete, onExport, fitToContainer = false, selectedIds: propSelectedIds, onSelectionChange, bulkActions }: {
+export function DataTable({ rows, columns, page, pageSize, total, sortBy, sortOrder, onPage, onPageSize, onSort, onEdit, onDelete, onView, onAutomation, automationLabel, rowMenuActions, rowAction, onRowClick, selectedRowId, onBulkDelete, onExport, fitToContainer = false, selectedIds: propSelectedIds, onSelectionChange, bulkActions, alwaysShowBulkActions }: {
   rows: RecordRow[];
   columns: ColumnConfig[];
   page: number;
@@ -31,11 +31,15 @@ export function DataTable({ rows, columns, page, pageSize, total, sortBy, sortOr
   selectedIds?: Set<string>;
   onSelectionChange?: (selectedIds: Set<string>) => void;
   bulkActions?: Array<{ label: string; onClick: (rows: RecordRow[]) => void; variant?: 'primary' | 'secondary'; icon?: React.ReactNode }>;
+  alwaysShowBulkActions?: boolean;
 }) {
   const [localSelectedIds, setLocalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = propSelectedIds ?? localSelectedIds;
   const setSelectedIds = (next: Set<string> | ((curr: Set<string>) => Set<string>)) => {
     const nextSet = typeof next === 'function' ? next(selectedIds) : next;
+    const elementsEqual = nextSet.size === selectedIds.size && [...nextSet].every((id) => selectedIds.has(id));
+    if (elementsEqual) return;
+
     if (propSelectedIds === undefined) {
       setLocalSelectedIds(nextSet);
     }
@@ -70,26 +74,29 @@ export function DataTable({ rows, columns, page, pageSize, total, sortBy, sortOr
 
   return (
     <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-      {selectedRows.length > 0 && (
-        bulkActions ? (
-          <div className="flex items-center justify-between border-b border-[#E4ECF3] bg-slate-50 px-4 py-2.5 text-xs">
-            <div className="flex items-center gap-3">
+      {(selectedRows.length > 0 || alwaysShowBulkActions) && bulkActions ? (
+        <div className="flex items-center justify-between border-b border-[#E4ECF3] bg-slate-50 px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-3">
+            {selectedRows.length > 0 && (
               <input aria-label="Clear selection" type="checkbox" checked={true} onChange={() => setSelectedIds(new Set())} className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-              <span className="font-bold text-slate-800 ml-1">{selectedRows.length} Selected</span>
-              <div className="flex items-center gap-2 ml-4">
-                {bulkActions.map((action) => (
-                  <button
-                    key={action.label}
-                    type="button"
-                    className={action.variant === 'primary' ? "inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#009E92] hover:bg-[#008277] px-3.5 text-[10px] font-semibold text-white transition shadow-sm" : "crm-secondary-button h-8 px-3.5 text-[10px] transition"}
-                    onClick={() => action.onClick(selectedRows)}
-                  >
-                    {action.icon}
-                    {action.label}
-                  </button>
-                ))}
-              </div>
+            )}
+            <span className="font-bold text-slate-800 ml-1">{selectedRows.length} Selected</span>
+            <div className="flex items-center gap-2 ml-4">
+              {bulkActions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  disabled={selectedRows.length === 0}
+                  className={(action.variant === 'primary' ? "inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#009E92] hover:bg-[#008277] px-3.5 text-[10px] font-semibold text-white transition shadow-sm" : "crm-secondary-button h-8 px-3.5 text-[10px] transition") + " disabled:opacity-50 disabled:cursor-not-allowed"}
+                  onClick={() => action.onClick(selectedRows)}
+                >
+                  {action.icon}
+                  {action.label}
+                </button>
+              ))}
             </div>
+          </div>
+          {selectedRows.length > 0 && (
             <button
               type="button"
               className="text-[#b91c1c] hover:text-red-700 font-bold flex items-center gap-1 text-[11px] transition"
@@ -98,8 +105,9 @@ export function DataTable({ rows, columns, page, pageSize, total, sortBy, sortOr
               <X className="h-3.5 w-3.5" />
               Clear Selection
             </button>
-          </div>
-        ) : (
+          )}
+        </div>
+      ) : selectedRows.length > 0 && (
           <div className="flex items-center justify-between border-b border-[#E4ECF3] bg-[#D9F5F1]/30 px-4 py-2.5 text-xs">
             <span className="font-semibold text-[#009E92]">{selectedRows.length} record{selectedRows.length === 1 ? '' : 's'} selected</span>
             <div className="flex items-center gap-2">
@@ -109,7 +117,7 @@ export function DataTable({ rows, columns, page, pageSize, total, sortBy, sortOr
             </div>
           </div>
         )
-      )}
+      }
       <div className="overflow-x-auto">
         <table className={`w-full table-auto border-collapse ${onAutomation ? 'min-w-[1420px]' : fitToContainer ? 'min-w-[1120px]' : 'min-w-[1080px]'}`}>
           <thead className="bg-[#fcfdfd]">

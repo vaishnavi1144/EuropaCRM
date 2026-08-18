@@ -20,6 +20,12 @@ model User {
   isActive           Boolean                @default(true)
   lastLoginAt        DateTime?
   permissions        Json?
+  dashboardType      String                 @default("BENCHSALES")
+  smtpHost           String?
+  smtpPort           Int?
+  smtpUser           String?
+  smtpPass           String?
+  smtpFrom           String?
   ownedAccounts      Account[]              @relation("AccountOwner")
   ownedActivities    Activity[]             @relation("ActivityOwner")
   ownedProjects      AiProject[]            @relation("ProjectOwner")
