@@ -9,6 +9,8 @@ import { UsersPage } from '@/pages/UsersPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { MailPage } from '@/pages/MailPage';
+import { RoleMailPage } from '@/pages/RoleMailPage';
+import { roleMailConfigs } from '@/data/roleMailConfigs';
 import { useApp } from '@/context/AppContext';
 
 function ProtectedRoute() {
@@ -50,14 +52,16 @@ export default function App() {
           <Route path="campaigns" element={<AccessGate permission="campaigns"><ModulePage config={moduleConfigs.campaigns} /></AccessGate>} />
           <Route path="activities" element={<AccessGate permission="activities"><ModulePage config={moduleConfigs.activities} /></AccessGate>} />
           <Route path="reports" element={<AccessGate permission="sales-reports"><Reports type="sales" /></AccessGate>} />
-          <Route path="s-mail" element={<AccessGate permission="sales-mail-view"><MailPage module="sales" /></AccessGate>} />
+          <Route path="s-mail" element={<AccessGate permission="sales-mail-view"><RoleMailPage config={roleMailConfigs.sales} /></AccessGate>} />
+          <Route path="s-mail/groups" element={<AccessGate permission="sales-mail-view"><MailPage module="sales" /></AccessGate>} />
 
           <Route path="candidates" element={<AccessGate permission="candidates"><ModulePage config={moduleConfigs.candidates} /></AccessGate>} />
           <Route path="jobs" element={<AccessGate permission="jobs"><ModulePage config={moduleConfigs.jobs} /></AccessGate>} />
           <Route path="interviews" element={<AccessGate permission="interviews"><ModulePage config={moduleConfigs.interviews} /></AccessGate>} />
           <Route path="offers" element={<AccessGate permission="offers"><ModulePage config={moduleConfigs.offers} /></AccessGate>} />
           <Route path="recruitment-reports" element={<AccessGate permission="recruitment-reports"><Reports type="recruitment" /></AccessGate>} />
-          <Route path="it-mail" element={<AccessGate permission="recruitment-mail-view"><MailPage module="it" /></AccessGate>} />
+          <Route path="it-mail" element={<AccessGate permission="recruitment-mail-view"><RoleMailPage config={roleMailConfigs.it} /></AccessGate>} />
+          <Route path="it-mail/groups" element={<AccessGate permission="recruitment-mail-view"><MailPage module="it" /></AccessGate>} />
 
           <Route path="bench" element={<AccessGate permission="bench"><ModulePage config={moduleConfigs.bench} /></AccessGate>} />
           <Route path="submissions" element={<AccessGate permission="submissions"><ModulePage config={moduleConfigs.submissions} /></AccessGate>} />
@@ -65,13 +69,15 @@ export default function App() {
           <Route path="bench-offers" element={<AccessGate permission="placements"><ModulePage config={moduleConfigs['bench-offers']} /></AccessGate>} />
           <Route path="placements" element={<AccessGate permission="placements"><ModulePage config={moduleConfigs.placements} /></AccessGate>} />
           <Route path="bench-reports" element={<AccessGate permission="bench-reports"><Reports type="bench" /></AccessGate>} />
-          <Route path="bench-mail" element={<AccessGate permission="bench-mail-view"><MailPage module="bench" /></AccessGate>} />
+          <Route path="bench-mail" element={<AccessGate permission="bench-mail-view"><RoleMailPage config={roleMailConfigs.bench} /></AccessGate>} />
+          <Route path="bench-mail/groups" element={<AccessGate permission="bench-mail-view"><MailPage module="bench" /></AccessGate>} />
 
           <Route path="ai-projects" element={<AccessGate permission="ai-projects"><ModulePage config={moduleConfigs['ai-projects']} /></AccessGate>} />
           <Route path="tasks" element={<AccessGate permission="tasks"><ModulePage config={moduleConfigs.tasks} /></AccessGate>} />
           <Route path="resources" element={<AccessGate permission="resources"><ModulePage config={moduleConfigs.resources} /></AccessGate>} />
           <Route path="ai-reports" element={<AccessGate permission="ai-reports"><Reports type="ai" /></AccessGate>} />
-          <Route path="ai-mail" element={<AccessGate permission="ai-mail-view"><MailPage module="ai" /></AccessGate>} />
+          <Route path="ai-mail" element={<AccessGate permission="ai-mail-view"><RoleMailPage config={roleMailConfigs.ai} /></AccessGate>} />
+          <Route path="ai-mail/groups" element={<AccessGate permission="ai-mail-view"><MailPage module="ai" /></AccessGate>} />
 
           <Route path="users" element={<AccessGate permission="users"><UsersPage /></AccessGate>} />
           <Route path="settings" element={<AccessGate permission="settings"><SettingsPage /></AccessGate>} />

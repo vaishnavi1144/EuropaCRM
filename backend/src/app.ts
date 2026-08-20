@@ -15,6 +15,8 @@ import { authRouter } from './routes/auth.js';
 import { requireAuth } from './middleware/auth.js';
 import { prisma } from './lib/prisma.js';
 import { workflowsRouter } from './routes/workflows.js';
+import { emailAccountsPublicRouter, emailAccountsRouter } from './routes/emailAccounts.js';
+import { roleMailRouter } from './routes/roleMail.js';
 
 export const app = express();
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -47,7 +49,10 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 app.use('/api/auth', authRouter);
+app.use('/api/email-accounts', emailAccountsPublicRouter);
 app.use('/api', requireAuth);
+app.use('/api/email-accounts', emailAccountsRouter);
+app.use('/api/role-mail', roleMailRouter);
 app.use('/api/workflows', workflowsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/uploads', uploadsRouter);
