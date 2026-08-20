@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Mail, HardDrive, ShieldCheck, Save, Globe } from 'lucide-react';
+import { Mail, HardDrive, ShieldCheck, Save, Globe, AtSign, Plug, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'general' | 'email' | 'storage' | 'security'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'email' | 'accounts' | 'storage' | 'security'>('general');
   const [saving, setSaving] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [emailAccounts, setEmailAccounts] = useState<GmailAccount[]>([]);
+  const [oauthConfigured, setOauthConfigured] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   // State values
   const [companyName, setCompanyName] = useState('Europa CRM');
@@ -44,6 +49,53 @@ export function SettingsPage() {
     }).catch(() => toast.error('Unable to load saved settings'));
   }, []);
 
+  const loadEmailAccounts = async () => {
+    try {
+      const response = await api.listEmailAccounts<GmailAccount>();
+      setEmailAccounts(response.data);
+      setOauthConfigured(response.oauthConfigured);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load email accounts');
+    }
+  };
+
+  useEffect(() => {
+    void loadEmailAccounts();
+  }, []);
+
+  useEffect(() => {
+    const status = searchParams.get('gmail');
+    if (!status) return;
+    setActiveTab('accounts');
+    if (status === 'connected') toast.success('Gmail account connected');
+    else toast.error(searchParams.get('message') ?? 'Unable to connect Gmail account');
+    searchParams.delete('gmail');
+    searchParams.delete('message');
+    setSearchParams(searchParams, { replace: true });
+    void loadEmailAccounts();
+  }, [searchParams, setSearchParams]);
+
+  const connectGmail = async () => {
+    setConnecting(true);
+    try {
+      const { url } = await api.startGmailOAuth();
+      window.location.href = url;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to start Google authorization');
+      setConnecting(false);
+    }
+  };
+
+  const disconnectGmail = async (id: string) => {
+    try {
+      await api.disconnectEmailAccount(id);
+      toast.success('Gmail account disconnected');
+      await loadEmailAccounts();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to disconnect account');
+    }
+  };
+
   const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -78,6 +130,7 @@ export function SettingsPage() {
         <div className="w-56 shrink-0 space-y-1.5">
           <TabButton active={activeTab === 'general'} onClick={() => setActiveTab('general')} icon={<Globe className="h-4 w-4" />}>General Config</TabButton>
           <TabButton active={activeTab === 'email'} onClick={() => setActiveTab('email')} icon={<Mail className="h-4 w-4" />}>SMTP Server Setup</TabButton>
+          <TabButton active={activeTab === 'accounts'} onClick={() => setActiveTab('accounts')} icon={<AtSign className="h-4 w-4" />}>Email Accounts</TabButton>
           <TabButton active={activeTab === 'storage'} onClick={() => setActiveTab('storage')} icon={<HardDrive className="h-4 w-4" />}>AWS S3 Storage</TabButton>
           <TabButton active={activeTab === 'security'} onClick={() => setActiveTab('security')} icon={<ShieldCheck className="h-4 w-4" />}>Permissions & Security</TabButton>
         </div>
@@ -141,6 +194,29 @@ export function SettingsPage() {
                     <input type="password" placeholder={smtpPassConfigured ? 'Configured — leave blank to keep existing password' : 'Enter SMTP password'} className="crm-input" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} />
                   </label>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'accounts' && (
+              <div className="space-y-4">
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-sm font-bold text-[#071B4A] flex items-center gap-2"><AtSign className="h-4 w-4 text-[#009E92]" />Gmail Accounts</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Connect your own Gmail mailbox to send and receive mail inside S-mail, IT-mail, Bench-mail, and AI-mail. Each user sees only their own mailbox.</p>
+                </div>
+                {!oauthConfigured && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold text-amber-800">Google OAuth is not configured on the server. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI, and GOOGLE_TOKEN_ENCRYPTION_KEY.</div>}
+                <div className="space-y-2">
+                  {emailAccounts.map((account) => (
+                    <div key={account.id} className="flex items-center justify-between rounded-lg border border-[#E4ECF3] p-3">
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">{account.email}</div>
+                        <div className="text-[10px] text-slate-500">{account.displayName ?? account.provider} · {account.lastSyncedAt ? `Last synced ${new Date(account.lastSyncedAt).toLocaleString()}` : 'Never synced'}</div>
+                      </div>
+                      <button type="button" onClick={() => void disconnectGmail(account.id)} className="crm-secondary-button"><Trash2 className="h-4 w-4" />Disconnect</button>
+                    </div>
+                  ))}
+                  {!emailAccounts.length && <div className="py-6 text-center text-xs text-slate-500">No Gmail account connected yet.</div>}
+                </div>
+                <button type="button" disabled={connecting || !oauthConfigured} onClick={() => void connectGmail()} className="crm-primary-button disabled:cursor-not-allowed disabled:opacity-50"><Plug className="h-4 w-4" />{connecting ? 'Redirecting…' : 'Connect with Google'}</button>
               </div>
             )}
 
@@ -211,6 +287,8 @@ export function SettingsPage() {
     </div>
   );
 }
+
+type GmailAccount = { id: string; provider: string; email: string; displayName: string | null; isActive: boolean; lastSyncedAt: string | null };
 
 function TabButton({ children, active, onClick, icon }: { children: React.ReactNode; active?: boolean; onClick: () => void; icon: React.ReactNode }) {
   return (

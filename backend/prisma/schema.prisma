@@ -37,6 +37,9 @@ model User {
   ownedContacts      Contact[]              @relation("ContactOwner")
   ownedLeads         Lead[]                 @relation("LeadOwner")
   mailGroups         MailGroup[]
+  emailAccounts      EmailAccount[]
+  mailMessages       MailMessage[]
+  mailLabels         MailLabel[]
   notifications      Notification[]
   ownedOpportunities Opportunity[]          @relation("OpportunityOwner")
   managerId          String?
@@ -507,40 +510,40 @@ model Requirement {
 }
 
 model Submission {
-  id                String           @id @default(cuid())
-  candidateName     String
-  vendorCompany     String
-  candidateCompany  String?
-  vendorEmail       String?
+  id                 String            @id @default(cuid())
+  candidateName      String
+  vendorCompany      String
+  candidateCompany   String?
+  vendorEmail        String?
   implementationName String?
-  jobTitle          String
-  ratePerHour       Float            @default(0)
-  submissionDate    String?
-  status            String           @default("Submitted")
-  feedback          String?
-  ownerName         String
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  customData        Json?
-  benchConsultantId String?
-  requirementId     String?
-  jobId             String?
-  matchPercentage   Int?
-  matchDetails      Json?
-  benchInterviews   BenchInterview[]
-  benchOffers       BenchOffer[]
-  placement         Placement?
-  submissionEmails  SubmissionEmail[]
-  benchConsultant   Bench?           @relation(fields: [benchConsultantId], references: [id], onDelete: Restrict)
-  requirement       Requirement?     @relation(fields: [requirementId], references: [id])
-  job               Job?             @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  jobTitle           String
+  ratePerHour        Float             @default(0)
+  submissionDate     String?
+  status             String            @default("Submitted")
+  feedback           String?
+  ownerName          String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  customData         Json?
+  benchConsultantId  String?
+  requirementId      String?
+  jobId              String?
+  matchPercentage    Int?
+  matchDetails       Json?
+  benchInterviews    BenchInterview[]
+  benchOffers        BenchOffer[]
+  placement          Placement?
+  submissionEmails   SubmissionEmail[]
+  benchConsultant    Bench?            @relation(fields: [benchConsultantId], references: [id], onDelete: Restrict)
+  requirement        Requirement?      @relation(fields: [requirementId], references: [id])
+  job                Job?              @relation(fields: [jobId], references: [id], onDelete: Restrict)
 
+  @@unique([benchConsultantId, jobId, vendorCompany])
   @@index([candidateName])
   @@index([status])
   @@index([benchConsultantId])
   @@index([requirementId])
   @@index([jobId])
-  @@unique([benchConsultantId, jobId, vendorCompany])
 }
 
 enum SubmissionEmailStatus {
@@ -552,19 +555,19 @@ enum SubmissionEmailStatus {
 }
 
 model SubmissionEmail {
-  id            String                  @id @default(cuid())
-  submissionId  String
-  toEmail       String
-  ccEmail       String?
-  subject       String
-  body          String
-  attachments   Json?
-  sentBy        String
-  sentDate      DateTime?
-  status        SubmissionEmailStatus  @default(Draft)
-  messageId     String?
-  createdAt     DateTime                @default(now())
-  submission    Submission              @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  id           String                @id @default(cuid())
+  submissionId String
+  toEmail      String
+  ccEmail      String?
+  subject      String
+  body         String
+  attachments  Json?
+  sentBy       String
+  sentDate     DateTime?
+  status       SubmissionEmailStatus @default(Draft)
+  messageId    String?
+  createdAt    DateTime              @default(now())
+  submission   Submission            @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
   @@index([status])
@@ -650,26 +653,26 @@ model BenchOffer {
 }
 
 model Placement {
-  id                String      @id @default(cuid())
-  candidateName     String
-  clientCompany     String
-  vendorCompany     String
+  id                  String      @id @default(cuid())
+  candidateName       String
+  clientCompany       String
+  vendorCompany       String
   vendorEmail         String?
   vendorContactNumber String?
-  billingRate       Float       @default(0)
-  startDate         String?
-  endDate           String?
-  status            String      @default("Active")
-  ownerName         String
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  customData        Json?
-  submissionId      String?     @unique
-  benchConsultantId String?
-  benchOfferId      String?     @unique
-  benchConsultant   Bench?      @relation(fields: [benchConsultantId], references: [id], onDelete: Restrict)
-  benchOffer        BenchOffer? @relation(fields: [benchOfferId], references: [id])
-  submission        Submission? @relation(fields: [submissionId], references: [id])
+  billingRate         Float       @default(0)
+  startDate           String?
+  endDate             String?
+  status              String      @default("Active")
+  ownerName           String
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  customData          Json?
+  submissionId        String?     @unique
+  benchConsultantId   String?
+  benchOfferId        String?     @unique
+  benchConsultant     Bench?      @relation(fields: [benchConsultantId], references: [id], onDelete: Restrict)
+  benchOffer          BenchOffer? @relation(fields: [benchOfferId], references: [id])
+  submission          Submission? @relation(fields: [submissionId], references: [id])
 
   @@index([candidateName])
   @@index([status])
@@ -849,4 +852,94 @@ model MailGroupMember {
   @@unique([groupId, entityType, entityId])
   @@index([groupId])
   @@index([entityType, entityId])
+}
+
+model EmailAccount {
+  id             String        @id @default(cuid())
+  userId         String
+  provider       String        @default("GMAIL")
+  email          String
+  displayName    String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scope          String?
+  historyId      String?
+  lastSyncedAt   DateTime?
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       MailMessage[]
+
+  @@unique([userId, provider, email])
+  @@index([userId])
+}
+
+model MailMessage {
+  id                String             @id @default(cuid())
+  userId            String
+  accountId         String?
+  module            String
+  gmailId           String?
+  gmailThreadId     String?
+  direction         String             @default("INBOUND")
+  folder            String             @default("INBOX")
+  fromAddress       String
+  toAddresses       String[]
+  ccAddresses       String[]
+  bccAddresses      String[]
+  subject           String?
+  snippet           String?
+  bodyText          String?
+  bodyHtml          String?
+  attachments       Json?
+  isRead            Boolean            @default(false)
+  isStarred         Boolean            @default(false)
+  isDraft           Boolean            @default(false)
+  isTrashed         Boolean            @default(false)
+  isArchived        Boolean            @default(false)
+  sentAt            DateTime?
+  receivedAt        DateTime           @default(now())
+  linkedEntityType  String?
+  linkedEntityId    String?
+  submissionId      String?
+  benchConsultantId String?
+  jobId             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account           EmailAccount?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  labels            MailMessageLabel[]
+
+  @@unique([userId, module, gmailId])
+  @@index([userId, module, folder, receivedAt])
+  @@index([userId, module, gmailThreadId])
+  @@index([submissionId])
+}
+
+model MailLabel {
+  id        String             @id @default(cuid())
+  userId    String
+  module    String
+  name      String
+  color     String             @default("#009E92")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  MailMessageLabel[]
+
+  @@unique([userId, module, name])
+  @@index([userId, module])
+}
+
+model MailMessageLabel {
+  messageId String
+  labelId   String
+  createdAt DateTime    @default(now())
+  message   MailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  label     MailLabel   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, labelId])
+  @@index([labelId])
 }

@@ -100,6 +100,30 @@ export const api = {
   deleteMailGroup: (id: string) => request<{ success: boolean }>(`/email/groups/${id}`, { method: 'DELETE' }),
   duplicateMailGroup: <T>(id: string) => request<T>(`/email/groups/${id}/duplicate`, { method: 'POST' }),
   searchMailRecipients: <T>(module: 'sales' | 'it' | 'bench' | 'ai', entityType: string, q: string) => request<{ data: T[] }>(`/email/recipients/search?module=${module}&entityType=${entityType}&q=${encodeURIComponent(q)}`),
+  listEmailAccounts: <T>() => request<{ data: T[]; oauthConfigured: boolean }>('/email-accounts'),
+  startGmailOAuth: () => request<{ url: string }>('/email-accounts/oauth/start', { method: 'POST' }),
+  disconnectEmailAccount: (id: string) => request<{ success: boolean }>(`/email-accounts/${id}`, { method: 'DELETE' }),
+  roleMailCheck: <T>(module: string) => request<T>(`/role-mail/${module}/check`),
+  roleMailFolders: <T>(module: string) => request<T>(`/role-mail/${module}/folders`),
+  roleMailMessages: <T>(module: string, params: { folder?: string; search?: string; labelId?: string; entityType?: string; page?: number; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    return request<{ data: T[]; total: number; page: number; limit: number }>(`/role-mail/${module}/messages?${query.toString()}`);
+  },
+  roleMailMessage: <T>(module: string, id: string) => request<T>(`/role-mail/${module}/messages/${id}`),
+  roleMailThread: <T>(module: string, threadId: string) => request<{ data: T[] }>(`/role-mail/${module}/threads/${threadId}`),
+  roleMailCompose: <T>(module: string, data: Record<string, unknown>) => request<T>(`/role-mail/${module}/compose`, { method: 'POST', body: JSON.stringify(data) }),
+  roleMailReply: <T>(module: string, data: Record<string, unknown>) => request<T>(`/role-mail/${module}/reply`, { method: 'POST', body: JSON.stringify(data) }),
+  roleMailDraft: <T>(module: string, data: Record<string, unknown>) => request<T>(`/role-mail/${module}/draft`, { method: 'POST', body: JSON.stringify(data) }),
+  roleMailUpdate: <T>(module: string, id: string, data: Record<string, unknown>) => request<T>(`/role-mail/${module}/messages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  roleMailBulkUpdate: (module: string, data: Record<string, unknown>) => request<{ updated: number }>(`/role-mail/${module}/messages/bulk`, { method: 'PATCH', body: JSON.stringify(data) }),
+  roleMailLink: <T>(module: string, id: string, data: Record<string, unknown>) => request<T>(`/role-mail/${module}/messages/${id}/link`, { method: 'POST', body: JSON.stringify(data) }),
+  roleMailSync: (module: string) => request<{ imported: number; scanned: number; lastSyncedAt: string }>(`/role-mail/${module}/sync`, { method: 'POST', body: JSON.stringify({}) }),
+  roleMailLabels: <T>(module: string) => request<{ data: T[] }>(`/role-mail/${module}/labels`),
+  roleMailCreateLabel: <T>(module: string, data: { name: string; color?: string }) => request<T>(`/role-mail/${module}/labels`, { method: 'POST', body: JSON.stringify(data) }),
+  roleMailUpdateLabel: <T>(module: string, id: string, data: { name?: string; color?: string }) => request<T>(`/role-mail/${module}/labels/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  roleMailDeleteLabel: (module: string, id: string) => request<{ success: boolean }>(`/role-mail/${module}/labels/${id}`, { method: 'DELETE' }),
+  roleMailToggleLabel: (module: string, messageId: string, labelId: string) => request<{ attached: boolean }>(`/role-mail/${module}/messages/${messageId}/labels/${labelId}`, { method: 'POST' }),
   report: <T>(type: string) => request<T>(`/reports/${type}`),
   overview: <T>() => request<T>('/reports/overview'),
   benchDashboard: <T>(filters?: Record<string, string>) => {
