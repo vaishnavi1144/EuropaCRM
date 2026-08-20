@@ -216,7 +216,7 @@ export function SettingsPage() {
                   ))}
                   {!emailAccounts.length && <div className="py-6 text-center text-xs text-slate-500">No Gmail account connected yet.</div>}
                 </div>
-                <button type="button" disabled={connecting || !oauthConfigured} onClick={() => void connectGmail()} className="crm-primary-button"><Plug className="h-4 w-4" />{connecting ? 'Redirecting…' : 'Connect with Google'}</button>
+                <button type="button" disabled={connecting || !oauthConfigured} onClick={() => void connectGmail()} className="crm-primary-button disabled:cursor-not-allowed disabled:opacity-50"><Plug className="h-4 w-4" />{connecting ? 'Redirecting…' : 'Connect with Google'}</button>
               </div>
             )}
 
