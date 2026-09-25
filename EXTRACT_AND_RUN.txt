@@ -1,0 +1,23 @@
+EUROPA CRM - WINDOWS SAFE PACKAGE
+
+This package intentionally does not include node_modules because those dependency folders cause Windows "Path too long" extraction errors and contain platform-specific binaries.
+
+1. Extract this ZIP to a short path, for example: C:\Europa_CRM
+2. Open Command Prompt inside the extracted Europa_CRM folder.
+3. Start Docker Desktop.
+4. Run:
+
+   docker compose up -d postgres
+   npm ci
+   npm run db:generate
+   cd backend
+   npx prisma migrate deploy
+   npx prisma db seed
+   cd ..
+   npm run dev
+
+Open http://localhost:5173
+Default login: admin / admin123
+
+For an existing Europa CRM database, run "npm run db:link" once after migrate deploy and before starting the application.
+Never run "npx prisma migrate reset" on a database you need to keep.
